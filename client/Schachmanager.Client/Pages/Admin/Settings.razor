@@ -1,0 +1,130 @@
+@page "/settings"
+@attribute [Authorize(Roles = "Admin")]
+@inject BackupService BackupSvc
+@inject IJSRuntime JS
+
+<PageTitle>Schachmanager - Einstellungen</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <h2 class="fw-bold mb-4"><i class="bi bi-gear text-primary me-2"></i>Systemeinstellungen</h2>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    <div class="card sm-card p-4 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center">
+                <div class="sm-icon-circle me-3"><i class="bi bi-google"></i></div>
+                <div>
+                    <h5 class="fw-bold mb-0">Google Drive Backup</h5>
+                    <small class="text-muted">Cloud-Sicherung</small>
+                </div>
+            </div>
+            <button class="btn btn-success fw-bold" @onclick="TriggerDriveBackupAsync" disabled="@IsBackupRunning">
+                @if (IsBackupRunning)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>Sichere...</span>
+                }
+                else
+                {
+                    <span><i class="bi bi-cloud-arrow-up me-2"></i>Jetzt sichern</span>
+                }
+            </button>
+        </div>
+        <p class="text-muted small mt-3 mb-0">Lädt eine vollständige Kopie der Vereins-/Turnierdaten in den konfigurierten Google Drive Ordner hoch. Muss einmalig eingerichtet werden (siehe docs/DEPLOYMENT.md) - ohne Einrichtung erscheint eine entsprechende Meldung.</p>
+        @if (!string.IsNullOrEmpty(BackupMessage))
+        {
+            <div class="mt-3 p-2 rounded small fw-bold @(BackupIsError ? "bg-danger bg-opacity-10 text-danger" : "bg-success bg-opacity-10 text-success")">
+                <i class="bi @(BackupIsError ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill") me-2"></i>@BackupMessage
+            </div>
+        }
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card sm-card p-4 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="sm-icon-circle me-3"><i class="bi bi-cloud-download"></i></div>
+                    <div><h5 class="fw-bold mb-0">Backup erstellen</h5><small class="text-muted">Daten exportieren</small></div>
+                </div>
+                <p class="text-muted small mb-4">Sichert Vereine, Spieler, Turniere, Ergebnisse, Jugendmitglieder und Anwesenheiten als JSON-Datei (ohne Benutzerkonten).</p>
+                <button class="btn btn-outline-primary w-100" @onclick="DownloadBackupAsync"><i class="bi bi-download me-2"></i>Download starten</button>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card sm-card p-4 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="sm-icon-circle me-3" style="background: rgba(220,53,69,0.1); color: #dc3545;"><i class="bi bi-cloud-upload"></i></div>
+                    <div><h5 class="fw-bold mb-0">Daten wiederherstellen</h5><small class="text-muted">Backup importieren</small></div>
+                </div>
+                <p class="text-muted small mb-3">
+                    <span class="text-danger fw-bold">Achtung:</span> Die aktuellen Vereine/Spieler/Turniere/Jugenddaten werden dabei vollständig überschrieben!
+                </p>
+                <div class="position-relative">
+                    <InputFile OnChange="RestoreBackupAsync" class="position-absolute top-0 start-0 opacity-0 w-100 h-100" style="cursor:pointer; z-index:5;" accept=".json" />
+                    <button class="btn btn-outline-danger w-100"><i class="bi bi-folder2-open me-2"></i>Datei auswählen...</button>
+                </div>
+                @if (!string.IsNullOrEmpty(RestoreMessage))
+                {
+                    <div class="mt-3 text-center small fw-bold text-success">@RestoreMessage</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool IsBackupRunning;
+    private string? BackupMessage;
+    private bool BackupIsError;
+    private string? RestoreMessage;
+    private string? ErrorMessage;
+
+    private async Task DownloadBackupAsync()
+    {
+        try
+        {
+            var json = await BackupSvc.ExportAsJsonAsync();
+            await JS.InvokeVoidAsync("downloadFile", $"schachmanager-backup-{DateTime.Now:yyyy-MM-dd}.json", json);
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task RestoreBackupAsync(InputFileChangeEventArgs e)
+    {
+        RestoreMessage = null;
+        ErrorMessage = null;
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            await BackupSvc.ImportFromJsonAsync(json);
+            RestoreMessage = "Daten erfolgreich wiederhergestellt!";
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+        catch { ErrorMessage = "Fehler: Ungültiges Dateiformat."; }
+    }
+
+    private async Task TriggerDriveBackupAsync()
+    {
+        IsBackupRunning = true;
+        BackupMessage = null;
+        BackupIsError = false;
+        try
+        {
+            var result = await BackupSvc.TriggerGoogleDriveBackupAsync();
+            BackupMessage = $"Backup '{result.FileName}' erfolgreich auf Google Drive gesichert.";
+        }
+        catch (ApiException ex)
+        {
+            BackupIsError = true;
+            BackupMessage = ex.Message;
+        }
+        finally { IsBackupRunning = false; }
+    }
+}

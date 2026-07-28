@@ -10,6 +10,9 @@ import * as tournaments from "./routes/tournaments";
 import * as imports from "./routes/imports";
 import * as standings from "./routes/standings";
 import * as youth from "./routes/youth";
+import * as hallOfFame from "./routes/hallOfFame";
+import * as backup from "./routes/backup";
+import * as googleDriveBackup from "./routes/googleDriveBackup";
 
 const router = AutoRouter<AuthedRequest, [Env]>();
 
@@ -27,6 +30,7 @@ router.get("/api/tournaments", tournaments.listTournaments);
 router.get("/api/tournaments/:id", tournaments.getTournament);
 router.get("/api/tournaments/:id/standings", standings.getTournamentStandings);
 router.get("/api/leaderboard", standings.getLeaderboard);
+router.get("/api/hall-of-fame", hallOfFame.getHallOfFame);
 
 // --- Organizer+ write endpoints (clubs/players/tournaments/import) ---
 const organizer = requireRole("Organizer");
@@ -37,6 +41,7 @@ router.delete("/api/clubs/:id", organizer, clubs.deleteClub);
 router.post("/api/players", organizer, players.createPlayer);
 router.put("/api/players/:id", organizer, players.updatePlayer);
 router.delete("/api/players/:id", organizer, players.deletePlayer);
+router.post("/api/players/merge", organizer, players.mergePlayers);
 
 router.post("/api/tournaments", organizer, tournaments.createTournament);
 router.put("/api/tournaments/:id", organizer, tournaments.updateTournament);
@@ -59,6 +64,10 @@ router.post("/api/users", admin, users.createUser);
 router.put("/api/users/:id", admin, users.updateUser);
 router.delete("/api/users/:id", admin, users.deleteUser);
 router.post("/api/users/:id/reset-password", admin, users.resetPassword);
+
+router.get("/api/backup/export", admin, backup.exportBackup);
+router.post("/api/backup/import", admin, backup.importBackup);
+router.post("/api/backup/drive", admin, googleDriveBackup.triggerGoogleDriveBackup);
 
 router.all("*", (_request, env: Env) => error(env, "Not found", 404));
 

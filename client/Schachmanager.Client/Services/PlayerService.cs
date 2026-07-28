@@ -29,4 +29,12 @@ public class PlayerService
         var response = await _http.DeleteAsync($"api/players/{id}");
         await response.EnsureApiSuccessAsync();
     }
+
+    public async Task<MergePlayersResponse> MergeAsync(int survivorId, List<int> victimIds, string? firstname = null, string? lastname = null)
+    {
+        var body = new MergePlayersRequest { SurvivorId = survivorId, VictimIds = victimIds, Firstname = firstname, Lastname = lastname };
+        var response = await _http.PostAsJsonAsync("api/players/merge", body, ApiJson.Options);
+        await response.EnsureApiSuccessAsync();
+        return (await response.Content.ReadFromJsonAsync<MergePlayersResponse>(ApiJson.Options))!;
+    }
 }

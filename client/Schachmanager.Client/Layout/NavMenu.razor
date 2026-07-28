@@ -21,6 +21,8 @@
                     <li><NavLink class="dropdown-item" href="spieler"><i class="bi bi-people me-2"></i>@Culture.T("nav.players")</NavLink></li>
                     <li><NavLink class="dropdown-item" href="vereine"><i class="bi bi-shield me-2"></i>@Culture.T("nav.clubs")</NavLink></li>
                     <li><NavLink class="dropdown-item" href="auswertung"><i class="bi bi-graph-up-arrow me-2"></i>@Culture.T("nav.standings")</NavLink></li>
+                    <li><NavLink class="dropdown-item" href="hall-of-fame"><i class="bi bi-stars me-2"></i>Hall of Fame</NavLink></li>
+                    <li><AuthorizeView Roles="Admin,Organizer"><Authorized><NavLink class="dropdown-item" href="daten-detektiv"><i class="bi bi-search me-2"></i>Daten-Detektiv</NavLink></Authorized></AuthorizeView></li>
                 </ul>
             </li>
 
@@ -41,7 +43,15 @@
 
             <AuthorizeView Roles="Admin">
                 <Authorized>
-                    <li class="nav-item"><NavLink class="nav-link" href="admin/users"><i class="bi bi-person-gear me-1"></i>@Culture.T("nav.users")</NavLink></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-gear me-1"></i>Admin
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                            <li><NavLink class="dropdown-item" href="admin/users"><i class="bi bi-person-gear me-2"></i>@Culture.T("nav.users")</NavLink></li>
+                            <li><NavLink class="dropdown-item" href="settings"><i class="bi bi-gear me-2"></i>Einstellungen</NavLink></li>
+                        </ul>
+                    </li>
                 </Authorized>
             </AuthorizeView>
         </ul>

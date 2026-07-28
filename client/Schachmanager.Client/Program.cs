@@ -30,5 +30,7 @@ builder.Services.AddScoped<TournamentService>();
 builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddScoped<YouthService>();
 builder.Services.AddScoped<CultureService>();
+builder.Services.AddScoped<HallOfFameService>();
+builder.Services.AddScoped<BackupService>();
 
 await builder.Build().RunAsync();

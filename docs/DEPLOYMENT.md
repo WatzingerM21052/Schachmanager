@@ -43,6 +43,31 @@
 8. Visit the deployed site's `/setup` page once to create the first Admin account
    (`POST /api/auth/bootstrap-admin` only works while zero users exist).
 
+## Optional: Google Drive backup (Settings page)
+
+The "Jetzt sichern" button on `/settings` uploads a full data export to Google Drive.
+This requires OAuth credentials the club itself must create (a Cloudflare-only setup
+can't do this - it needs your Google account):
+
+1. In [Google Cloud Console](https://console.cloud.google.com), create a project, enable
+   the **Google Drive API**, and create an **OAuth 2.0 Client ID** (type: Desktop app -
+   simplest for generating a refresh token via the flow below).
+2. Use the [OAuth 2.0 Playground](https://developers.google.com/oauthplayground):
+   - Gear icon -> "Use your own OAuth credentials" -> paste your Client ID/Secret.
+   - Authorize scope `https://www.googleapis.com/auth/drive.file`.
+   - Exchange the authorization code for tokens - copy the **refresh token**.
+3. Set the secrets/vars on the Worker:
+   ```
+   npx wrangler secret put GOOGLE_CLIENT_ID
+   npx wrangler secret put GOOGLE_CLIENT_SECRET
+   npx wrangler secret put GOOGLE_REFRESH_TOKEN
+   ```
+4. Optionally add `GOOGLE_DRIVE_FOLDER_ID` (a specific Drive folder's ID from its URL) to
+   `[vars]` in `wrangler.toml` to keep backups organized; omit it to upload to Drive root.
+
+Without these set, the button returns a clear "not configured" message instead of failing
+silently.
+
 ## Ongoing deploys
 
 Pushing to `main`:

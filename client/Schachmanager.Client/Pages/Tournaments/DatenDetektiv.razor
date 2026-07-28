@@ -1,0 +1,294 @@
+@page "/daten-detektiv"
+@attribute [Authorize(Roles = "Admin,Organizer")]
+@inject PlayerService PlayerSvc
+@inject ClubService ClubSvc
+@inject IJSRuntime JS
+
+<PageTitle>Schachmanager - Daten-Detektiv</PageTitle>
+
+<div class="sm-hero text-white p-4 mb-4 rounded-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <h1 class="fw-bolder fs-2 mb-1 text-white"><i class="bi bi-search me-2 sm-accent-text"></i>Daten-Detektiv</h1>
+            <p class="opacity-75 mb-0">Erkennung von Schreibfehlern und doppelten Spielern.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-light" @onclick="ResetMemory" disabled="@IsSearching"><i class="bi bi-trash3 me-1"></i>Gedächtnis löschen</button>
+            <button class="btn btn-warning fw-bold text-dark" @onclick="AnalyzeAsync" disabled="@IsSearching"><i class="bi bi-arrow-clockwise me-1"></i>@(IsSearching ? "Scanne..." : "Neu scannen")</button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 pb-5">
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success">@SuccessMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    <div class="card sm-card p-4">
+        <div class="d-flex justify-content-between align-items-end mb-3 border-bottom pb-3">
+            <div>
+                <h5 class="fw-bold mb-1"><i class="bi bi-robot text-primary me-2"></i>Mögliche Duplikate (@DuplicateGroups.Count)</h5>
+                <p class="text-muted small mb-0">Phonetische Ähnlichkeit, vertauschte Vor-/Nachnamen und Tippfehler.</p>
+            </div>
+            @if (IgnoredSignatures.Count > 0)
+            {
+                <span class="badge bg-secondary">@IgnoredSignatures.Count ignoriert</span>
+            }
+        </div>
+
+        @if (IsSearching)
+        {
+            <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (DuplicateGroups.Count == 0)
+        {
+            <div class="alert alert-info text-center py-5"><i class="bi bi-check-circle-fill display-4 d-block mb-3"></i>Keine Duplikate gefunden.</div>
+        }
+        else
+        {
+            @foreach (var group in DuplicateGroups)
+            {
+                <div class="bg-light p-3 rounded-3 mb-3 border">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0">@group.Key</h6>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-dark" @onclick="() => OpenCustomMergeModal(group)"><i class="bi bi-pencil me-1"></i>Eigener Name...</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => IgnoreGroup(group)"><i class="bi bi-eye-slash me-1"></i>Ignorieren</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover bg-white mb-0 rounded overflow-hidden">
+                            <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Verein</th><th>Elo</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach (var p in group.Players)
+                                {
+                                    <tr>
+                                        <td><span class="badge bg-secondary">#@p.Id</span></td>
+                                        <td class="fw-bold">@p.Firstname @p.Lastname</td>
+                                        <td class="small text-muted">@ClubName(p.ClubId)</td>
+                                        <td>@(p.Elo?.ToString() ?? "-")</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-primary" @onclick="() => MergeIntoSurvivorAsync(group, p.Id)" disabled="@IsMerging">
+                                                <i class="bi bi-arrow-down-circle me-1"></i>Diesen behalten
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (ShowCustomMergeModal && SelectedGroup != null)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Spieler zusammenführen</h5><button class="btn-close" @onclick="() => ShowCustomMergeModal = false"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted small">Wie soll der Spieler nach dem Zusammenführen heißen?</p>
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label">Vorname</label><input class="form-control" @bind="CustomFirstname" /></div>
+                        <div class="col-6"><label class="form-label">Nachname</label><input class="form-control" @bind="CustomLastname" /></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => ShowCustomMergeModal = false">Abbrechen</button>
+                    <button class="btn btn-success" @onclick="MergeCustomAsync" disabled="@(string.IsNullOrWhiteSpace(CustomFirstname) || string.IsNullOrWhiteSpace(CustomLastname))">Speichern & Zusammenführen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private class DuplicateGroup
+    {
+        public string Key { get; set; } = "";
+        public List<PlayerDto> Players { get; set; } = new();
+    }
+
+    private const string StorageKey = "sm_ignored_duplicate_groups";
+    private List<PlayerDto> AllPlayers = new();
+    private List<ClubDto> Clubs = new();
+    private List<DuplicateGroup> DuplicateGroups = new();
+    private HashSet<string> IgnoredSignatures = new();
+    private bool IsSearching;
+    private bool IsMerging;
+    private string? SuccessMessage;
+    private string? ErrorMessage;
+    private bool ShowCustomMergeModal;
+    private DuplicateGroup? SelectedGroup;
+    private string CustomFirstname = "";
+    private string CustomLastname = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var savedJson = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (!string.IsNullOrEmpty(savedJson))
+            {
+                var loaded = System.Text.Json.JsonSerializer.Deserialize<List<string>>(savedJson);
+                if (loaded != null) IgnoredSignatures = new HashSet<string>(loaded);
+            }
+        }
+        catch { }
+
+        Clubs = await ClubSvc.GetAllAsync();
+        await AnalyzeAsync();
+    }
+
+    private string ClubName(int? clubId) => Clubs.FirstOrDefault(c => c.Id == clubId)?.Name ?? "Vereinslos";
+
+    private string GetGroupSignature(IEnumerable<PlayerDto> players) => string.Join("_", players.Select(p => p.Id).OrderBy(id => id));
+
+    private async Task SaveMemoryAsync()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(IgnoredSignatures.ToList());
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+    }
+
+    private async Task ResetMemory()
+    {
+        IgnoredSignatures.Clear();
+        await JS.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        SuccessMessage = "Gedächtnis gelöscht - alle ignorierten Kombinationen werden wieder angezeigt.";
+        await AnalyzeAsync();
+    }
+
+    // Phonetic normalization + Levenshtein distance, ported from the old DatenDetektiv.razor.
+    private static string ToPhoneticBase(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var s = text.ToLowerInvariant().Trim();
+        s = s.Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
+        s = s.Replace("ph", "f").Replace("y", "i").Replace("th", "t").Replace("dt", "t");
+        s = s.Replace(" ", "").Replace("-", "").Replace(".", "");
+
+        var result = new System.Text.StringBuilder();
+        char lastChar = '\0';
+        foreach (var c in s) { if (c != lastChar) result.Append(c); lastChar = c; }
+        return result.ToString();
+    }
+
+    private static int ComputeLevenshteinDistance(string s, string t)
+    {
+        var d = new int[s.Length + 1, t.Length + 1];
+        for (var i = 0; i <= s.Length; d[i, 0] = i++) { }
+        for (var j = 0; j <= t.Length; d[0, j] = j++) { }
+        for (var i = 1; i <= s.Length; i++)
+        {
+            for (var j = 1; j <= t.Length; j++)
+            {
+                var cost = t[j - 1] == s[i - 1] ? 0 : 1;
+                d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
+            }
+        }
+        return d[s.Length, t.Length];
+    }
+
+    private static bool AreSimilar(PlayerDto p1, PlayerDto p2)
+    {
+        var f1 = p1.Firstname.ToLowerInvariant().Trim();
+        var l1 = p1.Lastname.ToLowerInvariant().Trim();
+        var f2 = p2.Firstname.ToLowerInvariant().Trim();
+        var l2 = p2.Lastname.ToLowerInvariant().Trim();
+
+        if (f1 == f2 && l1 == l2) return true;
+        if (f1 == l2 && l1 == f2) return true;
+
+        var sound1 = ToPhoneticBase(f1 + l1);
+        var sound2 = ToPhoneticBase(f2 + l2);
+        var sound2Swapped = ToPhoneticBase(l2 + f2);
+
+        if (sound1.Contains(sound2) || sound2.Contains(sound1)) return true;
+        if (sound1.Contains(sound2Swapped) || sound2Swapped.Contains(sound1)) return true;
+
+        var distNormal = ComputeLevenshteinDistance(sound1, sound2);
+        var distSwapped = ComputeLevenshteinDistance(sound1, sound2Swapped);
+        var bestDist = Math.Min(distNormal, distSwapped);
+        var maxLength = Math.Max(sound1.Length, Math.Max(sound2.Length, sound2Swapped.Length));
+        if (maxLength == 0) return false;
+
+        return bestDist <= 4 || (double)bestDist / maxLength <= 0.35;
+    }
+
+    private async Task AnalyzeAsync()
+    {
+        IsSearching = true;
+        SuccessMessage = null;
+        ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            AllPlayers = await PlayerSvc.GetAllAsync();
+            var clusters = new List<List<PlayerDto>>();
+            foreach (var player in AllPlayers)
+            {
+                var addedToCluster = false;
+                foreach (var cluster in clusters)
+                {
+                    if (AreSimilar(player, cluster[0])) { cluster.Add(player); addedToCluster = true; break; }
+                }
+                if (!addedToCluster) clusters.Add(new List<PlayerDto> { player });
+            }
+
+            DuplicateGroups = clusters
+                .Where(c => c.Count > 1)
+                .Select(c => new DuplicateGroup { Key = $"{c[0].Firstname} {c[0].Lastname} (und Ähnliche)", Players = c })
+                .Where(g => !IgnoredSignatures.Contains(GetGroupSignature(g.Players)))
+                .ToList();
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+        finally { IsSearching = false; }
+    }
+
+    private void OpenCustomMergeModal(DuplicateGroup group)
+    {
+        SelectedGroup = group;
+        CustomFirstname = group.Players[0].Firstname;
+        CustomLastname = group.Players[0].Lastname;
+        ShowCustomMergeModal = true;
+    }
+
+    private async Task IgnoreGroup(DuplicateGroup group)
+    {
+        IgnoredSignatures.Add(GetGroupSignature(group.Players));
+        await SaveMemoryAsync();
+        DuplicateGroups.Remove(group);
+    }
+
+    private async Task MergeIntoSurvivorAsync(DuplicateGroup group, int survivorId) =>
+        await ExecuteMergeAsync(group, survivorId, null, null);
+
+    private async Task MergeCustomAsync() =>
+        await ExecuteMergeAsync(SelectedGroup!, SelectedGroup!.Players[0].Id, CustomFirstname, CustomLastname);
+
+    private async Task ExecuteMergeAsync(DuplicateGroup group, int survivorId, string? firstname, string? lastname)
+    {
+        IsMerging = true;
+        SuccessMessage = null;
+        ErrorMessage = null;
+        try
+        {
+            var victimIds = group.Players.Select(p => p.Id).Where(id => id != survivorId).ToList();
+            var result = await PlayerSvc.MergeAsync(survivorId, victimIds, firstname, lastname);
+            SuccessMessage = $"Erfolgreich! {result.DeletedPlayers} Doppelgänger gelöscht, {result.MergedResults} Ergebnisse übertragen.";
+            ShowCustomMergeModal = false;
+            await AnalyzeAsync();
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+        finally { IsMerging = false; }
+    }
+}
