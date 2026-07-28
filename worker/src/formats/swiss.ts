@@ -3,10 +3,10 @@
 // No Buchholz/Sonneborn-Berger tie-break yet since the schema has no tiebreak column;
 // plain points total is the documented fallback (see docs/DATA-MODEL.md).
 import type { TournamentFormat } from "./types";
-import { parsePairingCsv } from "./pairingCsvUtils";
+import { parsePairingRows } from "./pairingCsvUtils";
 import { sumPointsStandings } from "./standingsUtils";
 
 export const swiss: TournamentFormat = {
-  parseCsv: parsePairingCsv,
+  parseRows: parsePairingRows,
   computeStandings: sumPointsStandings,
 };

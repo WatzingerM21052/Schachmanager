@@ -69,7 +69,7 @@ export function findRosterColumns(rows: string[][]): { headerRowIndex: number; c
       if (v === "land" || v === "fed") columns.countryCol = j;
       if (v.includes("verein") || v.includes("club") || v.includes("ort")) columns.clubCol = j;
       if (v.startsWith("rg") || v.startsWith("rk") || v.startsWith("rang")) columns.rankCol = j;
-      if (v.includes("punkte") || v.includes("points") || v === "pts") columns.pointsCol = j;
+      if (v.includes("punkte") || v.includes("points") || v === "pts" || v.includes("pkt")) columns.pointsCol = j;
     });
     return { headerRowIndex: r, columns };
   }

@@ -5,6 +5,15 @@ import { logAudit } from "../db/audit";
 import type { TournamentRow, ClubRow, PlayerRow } from "../db/types";
 import { getFormat } from "../formats";
 import type { ParsedResultRow } from "../formats/types";
+import { parseCsvLines } from "../formats/csvUtils";
+import { xlsxToRows } from "../formats/xlsxUtils";
+
+/** .xlsx files are ZIP archives, which always start with the "PK" magic bytes - checking
+ * this (rather than trusting only the filename/content-type) means a mislabeled upload
+ * still gets parsed correctly. */
+function looksLikeXlsx(bytes: Uint8Array): boolean {
+  return bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+}
 
 async function findOrCreateClub(env: Env, name: string | null | undefined): Promise<number | null> {
   if (!name || !name.trim()) return null;
@@ -46,21 +55,26 @@ export async function importCsv(request: AuthedRequest, env: Env): Promise<Respo
   const tournament = await env.DB.prepare("SELECT * FROM Tournaments WHERE id = ?").bind(tournamentId).first<TournamentRow>();
   if (!tournament) return error(env, "Tournament not found", 404);
 
-  let fileText: string;
+  let fileBuffer: ArrayBuffer;
+  let fileName = "";
   const contentType = request.headers.get("Content-Type") ?? "";
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData();
     const file = form.get("file") as File | string | null;
     if (!file || typeof file === "string") return error(env, "Missing 'file' field in form data", 400);
-    fileText = await file.text();
+    fileBuffer = await file.arrayBuffer();
+    fileName = file.name ?? "";
   } else {
-    fileText = await request.text();
+    fileBuffer = await request.arrayBuffer();
   }
-  if (!fileText.trim()) return error(env, "Empty CSV content", 400);
+  if (fileBuffer.byteLength === 0) return error(env, "Empty file content", 400);
+
+  const isXlsx = /\.xlsx?$/i.test(fileName) || looksLikeXlsx(new Uint8Array(fileBuffer.slice(0, 2)));
+  const rows: string[][] = isXlsx ? xlsxToRows(fileBuffer) : parseCsvLines(new TextDecoder("utf-8").decode(fileBuffer));
 
   const format = getFormat(tournament.format);
-  const parsedRows: ParsedResultRow[] = format.parseCsv(fileText);
-  if (parsedRows.length === 0) return error(env, "No recognizable rows found in CSV (check header names)", 400);
+  const parsedRows: ParsedResultRow[] = format.parseRows(rows);
+  if (parsedRows.length === 0) return error(env, "No recognizable rows found in the uploaded file (check header names)", 400);
 
   let inserted = 0;
   for (const row of parsedRows) {

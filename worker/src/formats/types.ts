@@ -40,8 +40,14 @@ export interface StandingsContext {
 }
 
 export interface TournamentFormat {
-  /** Parses an uploaded CSV's text content into rows ready for insertion for ONE tournament. */
-  parseCsv(fileText: string): ParsedResultRow[];
+  /**
+   * Parses an already-tabularized upload (rows of cell strings) into rows ready for
+   * insertion for ONE tournament. The caller is responsible for turning whatever was
+   * uploaded - CSV text or an .xlsx workbook (e.g. a chess-results.com export) - into
+   * this same string[][] shape first, so every format's column-sniffing logic works
+   * identically regardless of source file type.
+   */
+  parseRows(rows: string[][]): ParsedResultRow[];
   /** Computes the leaderboard/standings for a set of tournaments+results belonging to this format. */
   computeStandings(ctx: StandingsContext): StandingRow[];
 }

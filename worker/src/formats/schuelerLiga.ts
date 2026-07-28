@@ -3,7 +3,7 @@
 // "best of 4 rounds" business logic (the separate SchuelerligaService.cs computed a
 // simpler, different total and was not what the UI actually used).
 import type { TournamentFormat, ParsedResultRow, StandingRow, StandingsContext } from "./types";
-import { findRosterColumns, parseCsvLines, splitName, toNumberOrNull } from "./csvUtils";
+import { findRosterColumns, splitName, toNumberOrNull } from "./csvUtils";
 import { ageGroupForBirthYear, currentSeasonYear } from "../ageGroup";
 import type { PlayerRow } from "../db/types";
 
@@ -20,8 +20,7 @@ function parseSeasonEndYear(season: string): number {
 }
 
 export const schuelerLiga: TournamentFormat = {
-  parseCsv(fileText: string): ParsedResultRow[] {
-    const rows = parseCsvLines(fileText);
+  parseRows(rows: string[][]): ParsedResultRow[] {
     const found = findRosterColumns(rows);
     if (!found) return [];
     const { headerRowIndex, columns } = found;

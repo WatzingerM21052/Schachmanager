@@ -7,7 +7,7 @@
 // furthest-reached round is their highest round_no; if their result in that round was a win,
 // they advanced past it (or are the champion, if it was the final round in the CSV).
 import type { TournamentFormat, StandingRow, StandingsContext } from "./types";
-import { parsePairingCsv } from "./pairingCsvUtils";
+import { parsePairingRows } from "./pairingCsvUtils";
 
 function isWin(resultCode: string | null): boolean {
   if (!resultCode) return false;
@@ -16,7 +16,7 @@ function isWin(resultCode: string | null): boolean {
 }
 
 export const knockout: TournamentFormat = {
-  parseCsv: parsePairingCsv,
+  parseRows: parsePairingRows,
 
   computeStandings(ctx: StandingsContext): StandingRow[] {
     const tournamentIds = new Set(ctx.tournaments.map((t) => t.id));

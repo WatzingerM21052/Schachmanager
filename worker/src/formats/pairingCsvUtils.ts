@@ -1,7 +1,7 @@
 // CSV helpers for formats that carry round-by-round PAIRING data (Swiss/RoundRobin/Knockout).
 // Pairings themselves are always produced by an external tool (per product decision - this
 // system never generates pairings), so parsing just needs to recognize per-round result rows.
-import { parseCsvLines, splitName, toNumberOrNull } from "./csvUtils";
+import { splitName, toNumberOrNull } from "./csvUtils";
 import type { ParsedResultRow } from "./types";
 
 export interface PairingColumnMap {
@@ -29,15 +29,14 @@ function findPairingColumns(rows: string[][]): { headerRowIndex: number; columns
       if (v.includes("brett") || v.includes("board")) columns.boardCol = j;
       if (v.includes("gegner") || v.includes("opponent")) columns.opponentCol = j;
       if (v.includes("ergebnis") || v.includes("result")) columns.resultCol = j;
-      if (v.includes("punkte") || v.includes("points") || v === "pts") columns.pointsCol = j;
+      if (v.includes("punkte") || v.includes("points") || v === "pts" || v.includes("pkt")) columns.pointsCol = j;
     });
     return { headerRowIndex: r, columns };
   }
   return null;
 }
 
-export function parsePairingCsv(fileText: string): ParsedResultRow[] {
-  const rows = parseCsvLines(fileText);
+export function parsePairingRows(rows: string[][]): ParsedResultRow[] {
   const found = findPairingColumns(rows);
   if (!found) return [];
   const { headerRowIndex, columns } = found;

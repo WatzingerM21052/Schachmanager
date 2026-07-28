@@ -2,11 +2,10 @@
 // Schuelerliga-specific rules (age classes, best-of-4, September season cutoff). Kept as
 // its own module so those rules can't silently leak into a plain team competition.
 import type { TournamentFormat, ParsedResultRow, StandingRow, StandingsContext } from "./types";
-import { findRosterColumns, parseCsvLines, toNumberOrNull } from "./csvUtils";
+import { findRosterColumns, toNumberOrNull } from "./csvUtils";
 
 export const teamLeague: TournamentFormat = {
-  parseCsv(fileText: string): ParsedResultRow[] {
-    const rows = parseCsvLines(fileText);
+  parseRows(rows: string[][]): ParsedResultRow[] {
     const found = findRosterColumns(rows);
     if (!found) return [];
     const { headerRowIndex, columns } = found;
