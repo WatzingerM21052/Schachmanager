@@ -28,8 +28,12 @@ Cloudflare D1 (SQLite-compatible relational database)
 
 ## Auth
 
-- Passwords are hashed with PBKDF2-HMAC-SHA256 (per-user salt, 210k iterations) via the
-  Workers-native `crypto.subtle` API - see `worker/src/auth/password.ts`.
+- Passwords are hashed with PBKDF2-HMAC-SHA256 (per-user salt, 100k iterations) via the
+  Workers-native `crypto.subtle` API - see `worker/src/auth/password.ts`. 100k is a hard
+  platform ceiling: Workers' `deriveBits` throws `NotSupportedError` above 100,000
+  iterations (discovered in production during initial deploy), below the 210k+ OWASP
+  baseline for general PBKDF2-SHA256 use elsewhere. `deriveBits` clamps defensively in
+  case the configured value is ever raised by mistake.
 - Sessions are signed HS256 JWTs (`worker/src/auth/jwt.ts`), returned on login and sent
   back as `Authorization: Bearer <token>`. Chosen over cookies because the GitHub
   Pages client and the Worker live on different origins/sites, and cross-site cookies run

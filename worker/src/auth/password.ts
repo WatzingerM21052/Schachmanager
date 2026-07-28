@@ -14,11 +14,16 @@ function fromHex(hex: string): Uint8Array {
   return bytes;
 }
 
+// Cloudflare Workers' crypto.subtle.deriveBits throws NotSupportedError above 100,000
+// PBKDF2 iterations - clamp defensively so a misconfigured env var can't take auth down.
+const WORKERS_PBKDF2_MAX_ITERATIONS = 100_000;
+
 async function deriveBits(
   password: string,
   salt: Uint8Array,
   iterations: number
 ): Promise<ArrayBuffer> {
+  const safeIterations = Math.min(iterations, WORKERS_PBKDF2_MAX_ITERATIONS);
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -27,7 +32,7 @@ async function deriveBits(
     ["deriveBits"]
   );
   return crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: salt as BufferSource, iterations, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as BufferSource, iterations: safeIterations, hash: "SHA-256" },
     keyMaterial,
     256
   );

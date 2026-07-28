@@ -27,6 +27,10 @@ function base64UrlDecode(str: string): Uint8Array {
 }
 
 async function hmacKey(secret: string): Promise<CryptoKey> {
+  // A missing secret must fail loudly, not silently sign/verify with the literal
+  // string "undefined" as the HMAC key - that would be a guessable, effectively
+  // unauthenticated key that looks like everything is working.
+  if (!secret) throw new Error("JWT_SECRET is not configured");
   return crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

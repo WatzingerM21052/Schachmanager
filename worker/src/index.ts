@@ -69,9 +69,9 @@ export default {
     }
 
     const authedRequest = request as AuthedRequest;
-    await attachUser(authedRequest, env);
 
     try {
+      await attachUser(authedRequest, env);
       return await router.fetch(authedRequest, env, ctx);
     } catch (err) {
       console.error(err);

@@ -13,4 +13,11 @@ describe("password hashing", () => {
     expect(hash).not.toContain("hunter2");
     expect(salt).not.toContain("hunter2");
   });
+
+  it("clamps iteration counts above the Workers PBKDF2 cap instead of erroring", async () => {
+    // Cloudflare Workers' crypto.subtle.deriveBits throws NotSupportedError above
+    // 100,000 iterations - this regression test guards the clamp in deriveBits().
+    const { hash, salt } = await hashPassword("some-password", 500_000);
+    expect(await verifyPassword("some-password", hash, salt, 500_000)).toBe(true);
+  });
 });

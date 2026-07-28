@@ -6,15 +6,18 @@ compatibility_flags = ["nodejs_compat"]
 # Public origin(s) allowed to call this API (CORS). Add your GitHub Pages URL here,
 # e.g. "https://<your-github-username>.github.io"
 [vars]
-ALLOWED_ORIGIN = "http://localhost:5000"
-PBKDF2_ITERATIONS = "210000"
+ALLOWED_ORIGIN = "https://watzingerm21052.github.io"
+# Cloudflare Workers' crypto.subtle.deriveBits hard-caps PBKDF2 at 100,000 iterations
+# (throws NotSupportedError above that) - this is the practical max on this runtime,
+# below the 210k+ OWASP recommendation for general PBKDF2-SHA256 use.
+PBKDF2_ITERATIONS = "100000"
 
 # Create with: wrangler d1 create schachmanager-db
 # Then paste the returned database_id below.
 [[d1_databases]]
 binding = "DB"
 database_name = "schachmanager-db"
-database_id = "REPLACE_WITH_REAL_D1_DATABASE_ID"
+database_id = "c02fcf94-6676-4856-916f-cce84f971dae"
 migrations_dir = "migrations"
 
 # Secrets (NOT set here - set via `wrangler secret put JWT_SECRET`):
