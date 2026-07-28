@@ -33,7 +33,7 @@
                     <tr>
                         <td class="fw-bold">@m.Lastname @m.Firstname</td>
                         <td>@m.Birthdate</td>
-                        <td><span class="badge bg-secondary">@m.AgeGroup</span></td>
+                        <td><span class="badge @AgeGroupBadge.CssClass(m.AgeGroup)">@m.AgeGroup</span></td>
                         <td>@m.YouthStatus</td>
                         <td>
                             <AuthorizeView Roles="Admin,Organizer">

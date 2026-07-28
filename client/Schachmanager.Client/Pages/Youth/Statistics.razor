@@ -1,0 +1,239 @@
+@page "/statistics"
+@attribute [Authorize(Roles = "Admin,Organizer,Member")]
+@inject YouthService YouthSvc
+@inject IJSRuntime JS
+
+<PageTitle>Schachmanager - Statistik</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+        <div>
+            <h2 class="fw-bold mb-0"><i class="bi bi-bar-chart-line-fill sm-accent-text me-2"></i>Statistik</h2>
+            <p class="text-muted small mb-0">Anwesenheiten und Altersstruktur</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm w-auto" @bind="SelectedSeason" @bind:after="RenderChartsAsync">
+                @foreach (var s in AvailableSeasons)
+                {
+                    <option value="@s">Saison @s</option>
+                }
+            </select>
+            <button class="btn btn-outline-success btn-sm" @onclick="ExportCsvAsync"><i class="bi bi-file-earmark-excel me-1"></i>CSV</button>
+        </div>
+    </div>
+
+    @if (Members == null)
+    {
+        <div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary"></div></div>
+    }
+    else
+    {
+        <div class="row g-4 mb-4">
+            <div class="col-lg-4 col-md-6">
+                <div class="card sm-card p-4 h-100">
+                    <h6 class="text-uppercase text-muted fw-bold small mb-3">Altersstruktur (Jugend)</h6>
+                    <div style="height:220px; position:relative;"><canvas id="ageChart"></canvas></div>
+                    <div class="mt-3 d-flex justify-content-center gap-4">
+                        <div class="text-center">
+                            <h4 class="mb-0 fw-bold">@Members.Count</h4>
+                            <small class="text-muted">Mitglieder</small>
+                        </div>
+                        <div class="vr"></div>
+                        <div class="text-center">
+                            <h4 class="mb-0 fw-bold">@ActiveLast3MonthsCount()</h4>
+                            <small class="text-muted">Aktiv (3 Mon.)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8 col-md-6">
+                <div class="card sm-card p-4 h-100">
+                    <h6 class="text-uppercase text-muted fw-bold small mb-3">Trainingstrend (@SelectedSeason)</h6>
+                    <div style="height:220px; position:relative;"><canvas id="monthChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card sm-card h-100 overflow-hidden">
+                    <div class="sm-card-header d-flex align-items-center justify-content-between">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-trophy-fill me-2 sm-accent-text"></i>Top Trainingsfleiß</h6>
+                        <span class="badge bg-light text-dark">@SelectedSeason</span>
+                    </div>
+                    <div class="table-responsive" style="max-height:500px; overflow-y:auto;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr><th class="text-center">Rang</th><th>Name</th><th>Klasse</th><th class="text-center">Trainings</th><th class="text-end">Quote</th></tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var statsList = AttendanceLeaderboard().ToList();
+                                }
+                                @foreach (var stat in statsList)
+                                {
+                                    <tr>
+                                        <td class="text-center fw-bold">@stat.Rank.</td>
+                                        <td class="fw-bold">@stat.Name</td>
+                                        <td><span class="badge @AgeGroupBadge.CssClass(stat.AgeGroup)">@stat.AgeGroup</span></td>
+                                        <td class="text-center fw-bold sm-points">@stat.Count</td>
+                                        <td class="text-end">
+                                            <div class="d-flex align-items-center justify-content-end gap-2">
+                                                <div class="progress flex-grow-1" style="height:6px; width:80px;">
+                                                    <div class="progress-bar" style="width:@(stat.Percentage.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+                                                </div>
+                                                <small class="fw-bold text-muted">@(Math.Round(stat.Percentage))%</small>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (statsList.Count == 0)
+                                {
+                                    <tr><td colspan="5" class="text-center py-4 text-muted">Keine Trainingsdaten in dieser Saison.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <h6 class="text-uppercase text-muted fw-bold small mb-3">Letzte Einheiten</h6>
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var day in LastTrainings())
+                    {
+                        <div class="card sm-card p-3 d-flex flex-row align-items-center">
+                            <div class="me-3 text-center rounded-3 bg-light border d-flex flex-column justify-content-center" style="width:50px; height:50px; flex-shrink:0;">
+                                <span class="d-block small text-uppercase fw-bold text-muted lh-1" style="font-size:0.6rem;">@day.Date.ToString("MMM")</span>
+                                <span class="d-block fs-5 fw-bold sm-accent-text lh-1">@day.Date.Day</span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="fw-bold mb-0">Training</h6>
+                                <small class="text-muted">@day.Date.ToString("dddd, d. MMMM")</small>
+                            </div>
+                            <span class="badge bg-primary rounded-pill">@day.Count</span>
+                        </div>
+                    }
+                    @if (!LastTrainings().Any())
+                    {
+                        <p class="text-muted small">Keine Einheiten in dieser Saison.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<YouthMemberDto>? Members;
+    private List<AttendanceDto> AllAttendance = new();
+    private List<string> AvailableSeasons = new();
+    private string SelectedSeason = SeasonHelper.CurrentSeason();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Members = await YouthSvc.GetMembersAsync();
+        AllAttendance = await YouthSvc.GetAttendanceAsync();
+
+        AvailableSeasons = AllAttendance.Select(a => SeasonHelper.SeasonLabelForDate(a.Date)).Distinct().OrderByDescending(s => s).ToList();
+        if (!AvailableSeasons.Contains(SelectedSeason))
+        {
+            if (!AvailableSeasons.Contains(SeasonHelper.CurrentSeason())) AvailableSeasons.Insert(0, SeasonHelper.CurrentSeason());
+            SelectedSeason = AvailableSeasons.FirstOrDefault() ?? SeasonHelper.CurrentSeason();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Members != null) await RenderChartsAsync();
+    }
+
+    private IEnumerable<AttendanceDto> FilteredAttendance() =>
+        AllAttendance.Where(a => SeasonHelper.SeasonLabelForDate(a.Date) == SelectedSeason && a.Present);
+
+    private int ActiveLast3MonthsCount()
+    {
+        var cutoff = DateOnly.FromDateTime(DateTime.Today.AddMonths(-3));
+        return AllAttendance.Where(a => a.Present && DateOnly.TryParse(a.Date, out var d) && d >= cutoff)
+            .Select(a => a.MemberId).Distinct().Count();
+    }
+
+    private List<(int Rank, string Name, string AgeGroup, int Count, double Percentage)> AttendanceLeaderboard()
+    {
+        if (Members == null) return new();
+        var filtered = FilteredAttendance().ToList();
+        var totalTrainingDays = Math.Max(1, filtered.Select(a => a.Date).Distinct().Count());
+
+        var list = Members
+            .Select(m => new { m.Firstname, m.Lastname, AgeGroup = m.AgeGroup ?? "Ohne", Count = filtered.Count(a => a.MemberId == m.Id) })
+            .Where(x => x.Count > 0)
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Lastname)
+            .Select(x => (Name: $"{x.Lastname} {x.Firstname}", x.AgeGroup, x.Count, Percentage: (double)x.Count / totalTrainingDays * 100))
+            .ToList();
+
+        var result = new List<(int Rank, string Name, string AgeGroup, int Count, double Percentage)>();
+        int rank = 0, lastCount = -1;
+        foreach (var x in list)
+        {
+            if (x.Count != lastCount) { rank++; lastCount = x.Count; }
+            result.Add((rank, x.Name, x.AgeGroup, x.Count, x.Percentage));
+        }
+        return result;
+    }
+
+    private List<(DateTime Date, int Count)> LastTrainings() =>
+        FilteredAttendance()
+            .Where(a => DateOnly.TryParse(a.Date, out _))
+            .GroupBy(a => a.Date)
+            .OrderByDescending(g => g.Key)
+            .Take(5)
+            .Select(g => (Date: DateOnly.Parse(g.Key).ToDateTime(TimeOnly.MinValue), Count: g.Count()))
+            .ToList();
+
+    private async Task RenderChartsAsync()
+    {
+        if (Members == null) return;
+
+        var categories = Members.GroupBy(m => m.AgeGroup ?? "Ohne").OrderBy(g => g.Key.Length).ThenBy(g => g.Key).ToList();
+        var ageConfig = new
+        {
+            type = "doughnut",
+            data = new
+            {
+                labels = categories.Select(g => g.Key).ToArray(),
+                datasets = new[] { new { data = categories.Select(g => g.Count()).ToArray(), backgroundColor = new[] { "#198754", "#0dcaf0", "#0d6efd", "#ffc107", "#dc3545", "#212529", "#6c757d" }, borderWidth = 0 } },
+            },
+            options = new { plugins = new { legend = new { position = "right" } }, cutout = "70%", maintainAspectRatio = false },
+        };
+        await JS.InvokeVoidAsync("setupChart", "ageChart", ageConfig);
+
+        var months = FilteredAttendance()
+            .Where(a => DateOnly.TryParse(a.Date, out _))
+            .Select(a => DateOnly.Parse(a.Date))
+            .GroupBy(d => new { d.Year, d.Month })
+            .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
+            .ToList();
+        var monthConfig = new
+        {
+            type = "bar",
+            data = new
+            {
+                labels = months.Select(g => $"{g.Key.Month}/{g.Key.Year}").ToArray(),
+                datasets = new[] { new { label = "Teilnehmer", data = months.Select(g => g.Count()).ToArray(), backgroundColor = "#1e3a5f", borderRadius = 4, barThickness = 20 } },
+            },
+            options = new { maintainAspectRatio = false, plugins = new { legend = new { display = false } }, scales = new { y = new { beginAtZero = true, grid = new { display = false } }, x = new { grid = new { display = false } } } },
+        };
+        await JS.InvokeVoidAsync("setupChart", "monthChart", monthConfig);
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Trainingsstatistik Saison {SelectedSeason}");
+        sb.AppendLine("Rang;Name;Klasse;Trainings;Quote");
+        foreach (var s in AttendanceLeaderboard())
+        {
+            sb.AppendLine($"{s.Rank};{s.Name};{s.AgeGroup};{s.Count};{Math.Round(s.Percentage)}%");
+        }
+        await JS.InvokeVoidAsync("downloadFile", $"Statistik_{SelectedSeason.Replace("/", "_")}.csv", sb.ToString());
+    }
+}

@@ -66,18 +66,30 @@ export async function updateUser(request: AuthedRequest, env: Env): Promise<Resp
   return json(env, publicUser(updated!));
 }
 
-/** Admin-triggered reset: generates a fresh password, hashes it, and returns the plaintext ONCE. */
+/**
+ * Admin-triggered password (re)set. With no body (or an empty one), generates a fresh
+ * random password. With { password: "..." } in the body, the admin sets that exact
+ * password instead - matching the old app's "manual password override", but the value
+ * is hashed immediately and never stored/returned in plaintext afterwards (unlike the
+ * old app, which round-tripped the current password so the admin could see it later).
+ */
 export async function resetPassword(request: AuthedRequest, env: Env): Promise<Response> {
   const id = Number(request.params?.id);
   const target = await env.DB.prepare("SELECT id FROM Users WHERE id = ?").bind(id).first();
   if (!target) return error(env, "User not found", 404);
 
-  const plaintextPassword = generateRandomPassword();
+  const body = (await request.json().catch(() => null)) as { password?: string } | null;
+  const manualPassword = body?.password?.trim();
+  if (manualPassword && manualPassword.length < 10) {
+    return error(env, "Password must be at least 10 characters", 400);
+  }
+
+  const plaintextPassword = manualPassword || generateRandomPassword();
   const iterations = parseInt(env.PBKDF2_ITERATIONS, 10);
   const { hash, salt } = await hashPassword(plaintextPassword, iterations);
 
   await env.DB.prepare("UPDATE Users SET password_hash = ?, password_salt = ? WHERE id = ?").bind(hash, salt, id).run();
-  await logAudit(env, request.user!.sub, "reset_password", "User", id);
+  await logAudit(env, request.user!.sub, manualPassword ? "set_manual_password" : "reset_password", "User", id);
 
   return json(env, { generatedPassword: plaintextPassword });
 }

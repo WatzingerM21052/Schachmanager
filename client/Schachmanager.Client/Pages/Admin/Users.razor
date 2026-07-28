@@ -50,7 +50,7 @@
                             <button class="btn btn-sm @(u.IsActive ? "btn-outline-warning" : "btn-outline-success") me-1" @onclick="() => ToggleActiveAsync(u)">
                                 @(u.IsActive ? "Deaktivieren" : "Aktivieren")
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => ResetPasswordAsync(u)"><i class="bi bi-key"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartPasswordChange(u)"><i class="bi bi-key"></i></button>
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(u)"><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
@@ -90,6 +90,31 @@
     </div>
 }
 
+@if (PasswordChangeUser != null)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.4);" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Passwort für @PasswordChangeUser.Username</h5>
+                    <button class="btn-close" @onclick="() => PasswordChangeUser = null"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Eigenes Passwort (mind. 10 Zeichen, optional)</label>
+                        <input class="form-control" @bind="ManualPassword" placeholder="Leer lassen für automatisch generiertes Passwort" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => PasswordChangeUser = null">Abbrechen</button>
+                    <button class="btn btn-outline-primary" @onclick="() => ApplyPasswordChangeAsync(manual: false)"><i class="bi bi-shuffle me-1"></i>Zufällig generieren</button>
+                    <button class="btn btn-primary" @onclick="() => ApplyPasswordChangeAsync(manual: true)" disabled="@(string.IsNullOrWhiteSpace(ManualPassword))">Eigenes Passwort setzen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<UserDto>? UserList;
     private string? ErrorMessage;
@@ -99,6 +124,8 @@
     private string NewRole = "Member";
     private string? LastGeneratedPassword;
     private string? LastGeneratedPasswordFor;
+    private UserDto? PasswordChangeUser;
+    private string ManualPassword = "";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -140,13 +167,27 @@
         catch (ApiException ex) { ErrorMessage = ex.Message; }
     }
 
-    private async Task ResetPasswordAsync(UserDto u)
+    private void StartPasswordChange(UserDto u)
     {
+        PasswordChangeUser = u;
+        ManualPassword = "";
+    }
+
+    private async Task ApplyPasswordChangeAsync(bool manual)
+    {
+        if (PasswordChangeUser == null) return;
+        if (manual && (ManualPassword.Length < 10))
+        {
+            ErrorMessage = "Passwort muss mindestens 10 Zeichen haben.";
+            return;
+        }
         try
         {
-            var newPassword = await UserSvc.ResetPasswordAsync(u.Id);
+            var newPassword = await UserSvc.ResetPasswordAsync(PasswordChangeUser.Id, manual ? ManualPassword : null);
             LastGeneratedPassword = newPassword;
-            LastGeneratedPasswordFor = u.Username;
+            LastGeneratedPasswordFor = PasswordChangeUser.Username;
+            PasswordChangeUser = null;
+            ManualPassword = "";
         }
         catch (ApiException ex) { ErrorMessage = ex.Message; }
     }

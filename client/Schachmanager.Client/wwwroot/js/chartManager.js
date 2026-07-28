@@ -16,8 +16,18 @@ window.chartManager = {
                 scales: { y: { beginAtZero: true, grid: { color: '#f0f0f0' } }, x: { grid: { display: false } } }
             }
         });
+    },
+    // Generic entry point for pages that need chart types/options beyond renderBarChart
+    // (e.g. Statistics.razor's doughnut age chart) - takes a full Chart.js config object.
+    setupChart: function (canvasId, config) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (window.chartManager.instances[canvasId]) window.chartManager.instances[canvasId].destroy();
+        window.chartManager.instances[canvasId] = new Chart(ctx, config);
     }
 };
+
+window.setupChart = window.chartManager.setupChart;
 
 window.downloadFile = function (fileName, content) {
     const link = document.createElement('a');

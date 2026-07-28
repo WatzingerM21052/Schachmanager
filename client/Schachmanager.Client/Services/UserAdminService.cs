@@ -27,9 +27,12 @@ public class UserAdminService
         await response.EnsureApiSuccessAsync();
     }
 
-    public async Task<string> ResetPasswordAsync(int id)
+    /// <summary>Generates a fresh random password when <paramref name="manualPassword"/> is null,
+    /// or sets that exact password when provided (matches the old app's manual override, but the
+    /// value is hashed immediately and never stored/shown again afterwards).</summary>
+    public async Task<string> ResetPasswordAsync(int id, string? manualPassword = null)
     {
-        var response = await _http.PostAsync($"api/users/{id}/reset-password", null);
+        var response = await _http.PostAsJsonAsync($"api/users/{id}/reset-password", new { password = manualPassword }, ApiJson.Options);
         await response.EnsureApiSuccessAsync();
         var result = await response.Content.ReadFromJsonAsync<ResetPasswordResponse>(ApiJson.Options);
         return result?.GeneratedPassword ?? "";

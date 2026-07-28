@@ -35,7 +35,7 @@
                     <tr>
                         <td>@p.Lastname @p.Firstname</td>
                         <td class="text-muted small">@ClubName(p.ClubId)</td>
-                        <td><span class="badge bg-secondary">@(p.AgeGroup ?? "-")</span></td>
+                        <td><span class="badge @AgeGroupBadge.CssClass(p.AgeGroup)">@(p.AgeGroup ?? "-")</span></td>
                         <td>@(p.Elo?.ToString() ?? "-")</td>
                         <td>@p.Country</td>
                         <td>

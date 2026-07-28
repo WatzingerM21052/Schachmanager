@@ -4,8 +4,8 @@
 <PageTitle>Schachmanager - Turniertabelle</PageTitle>
 
 <div class="container-fluid px-4 py-3">
-    <a href="turniere" class="small"><i class="bi bi-arrow-left me-1"></i>Zurück zu Turniere</a>
-    <h2 class="fw-bold mt-2"><i class="bi bi-list-ol text-primary me-2"></i>Tabelle</h2>
+    <a href="turniere" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Zurück zu Turniere</a>
+    <h2 class="fw-bold mt-2 mb-4"><i class="bi bi-list-ol text-primary me-2"></i>Tabelle</h2>
 
     @if (Standings == null)
     {
@@ -17,24 +17,35 @@
     }
     else
     {
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr><th>Rang</th><th>Name / Team</th><th>Verein</th><th>Klasse</th><th class="text-center">Punkte</th><th class="text-center">Runden</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var row in Standings)
-                {
-                    <tr>
-                        <td class="fw-bold">@row.Rank.</td>
-                        <td>@row.DisplayName</td>
-                        <td class="text-muted small">@row.ClubName</td>
-                        <td>@(row.AgeGroup != null ? (MarkupString)$"<span class='badge bg-secondary'>{row.AgeGroup}</span>" : (MarkupString)"")</td>
-                        <td class="text-center fw-bold text-success">@row.Points</td>
-                        <td class="text-center text-muted">@row.TournamentsPlayed</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        @foreach (var group in Standings.GroupBy(r => r.AgeGroup ?? (r.TeamName != null ? "Teams" : "Ohne"))
+                      .OrderBy(g => g.Key.Length).ThenBy(g => g.Key))
+        {
+            <div class="card sm-card mb-4">
+                <div class="card-header sm-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-diagram-3-fill me-2 sm-accent-text"></i>Klasse @group.Key</h5>
+                    <span class="badge bg-light text-dark">@group.Count() Teilnehmer</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>Rang</th><th>Name / Team</th><th>Verein</th><th class="text-center">Punkte</th><th class="text-center">Runden</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in group.OrderBy(r => r.Rank))
+                            {
+                                <tr>
+                                    <td class="fw-bold">@RankBadge(row.Rank)</td>
+                                    <td class="fw-bold">@row.DisplayName</td>
+                                    <td class="text-muted small">@row.ClubName</td>
+                                    <td class="text-center fw-bold sm-points">@row.Points</td>
+                                    <td class="text-center text-muted">@row.TournamentsPlayed</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -46,4 +57,12 @@
     {
         Standings = await TournamentSvc.GetStandingsAsync(Id);
     }
+
+    private MarkupString RankBadge(int rank) => rank switch
+    {
+        1 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill text-warning ms-1\" title=\"Gold\"></i>"),
+        2 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill text-secondary ms-1\" title=\"Silber\"></i>"),
+        3 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill\" style=\"color:#cd7f32;\" title=\"Bronze\"></i>"),
+        _ => new MarkupString($"{rank}."),
+    };
 }

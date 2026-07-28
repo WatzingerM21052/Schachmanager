@@ -10,10 +10,10 @@
         <button class="btn btn-outline-success" @onclick="ExportCsvAsync"><i class="bi bi-file-earmark-excel me-1"></i>CSV Export</button>
     </div>
 
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card sm-card mb-4">
         <div class="card-body p-3">
             <div class="row g-3 align-items-center">
-                <div class="col-md-auto text-muted fw-bold text-uppercase small"><i class="bi bi-funnel me-1"></i>Filter:</div>
+                <div class="col-md-auto text-muted fw-bold text-uppercase small"><i class="bi bi-funnel me-1 sm-accent-text"></i>Filter:</div>
                 <div class="col-md-2">
                     <select class="form-select form-select-sm" @bind="SelectedSeason" @bind:after="LoadAsync">
                         @foreach (var s in AvailableSeasons)
@@ -58,13 +58,13 @@
     {
         <div class="row g-4 mb-4">
             <div class="col-md-6">
-                <div class="card border-0 shadow-sm h-100">
+                <div class="card sm-card h-100">
                     <div class="card-header bg-white border-0 pt-3 pb-0"><h6 class="text-muted fw-bold text-uppercase small m-0">Altersklassen-Verteilung</h6></div>
                     <div class="card-body pt-2" style="height:200px;"><canvas id="ageChart"></canvas></div>
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card border-0 shadow-sm h-100">
+                <div class="card sm-card h-100">
                     <div class="card-header bg-white border-0 pt-3 pb-0"><h6 class="text-muted fw-bold text-uppercase small m-0">Vereins-Verteilung (Top 5)</h6></div>
                     <div class="card-body pt-2" style="height:200px;"><canvas id="clubChart"></canvas></div>
                 </div>
@@ -73,9 +73,9 @@
 
         @foreach (var group in Rows.GroupBy(r => r.AgeGroup).OrderBy(g => (g.Key ?? "").Length).ThenBy(g => g.Key))
         {
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-diagram-3-fill me-2 text-warning"></i>Klasse @group.Key</h5>
+            <div class="card sm-card mb-4">
+                <div class="card-header sm-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-diagram-3-fill me-2 sm-accent-text"></i>Klasse @group.Key</h5>
                     <span class="badge bg-light text-dark">@group.Count() Spieler</span>
                 </div>
                 <div class="table-responsive">
@@ -87,10 +87,10 @@
                             @foreach (var row in group.OrderBy(r => r.Rank))
                             {
                                 <tr>
-                                    <td class="fw-bold">@row.Rank.</td>
+                                    <td class="fw-bold">@RankBadge(row.Rank)</td>
                                     <td class="fw-bold">@row.DisplayName</td>
                                     <td class="text-muted small">@row.ClubName</td>
-                                    <td class="text-center fw-bold text-success">@row.Points</td>
+                                    <td class="text-center fw-bold sm-points">@row.Points</td>
                                     <td class="text-center text-muted">@row.TournamentsPlayed</td>
                                 </tr>
                             }
@@ -167,4 +167,12 @@
         }
         await JS.InvokeVoidAsync("downloadFile", $"Auswertung_{SelectedSeason.Replace("/", "_")}.csv", sb.ToString());
     }
+
+    private MarkupString RankBadge(int rank) => rank switch
+    {
+        1 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill text-warning ms-1\" title=\"Gold\"></i>"),
+        2 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill text-secondary ms-1\" title=\"Silber\"></i>"),
+        3 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill ms-1\" style=\"color:#cd7f32;\" title=\"Bronze\"></i>"),
+        _ => new MarkupString($"{rank}."),
+    };
 }
