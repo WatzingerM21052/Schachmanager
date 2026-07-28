@@ -1,23 +1,35 @@
 @page "/turniere/{Id:int}/standings"
 @inject TournamentService TournamentSvc
 
-<PageTitle>Schachmanager - Turniertabelle</PageTitle>
+<PageTitle>Schachmanager - Turnierergebnisse</PageTitle>
 
 <div class="container-fluid px-4 py-3">
     <a href="turniere" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Zurück zu Turniere</a>
-    <h2 class="fw-bold mt-2 mb-4"><i class="bi bi-list-ol text-primary me-2"></i>Tabelle</h2>
+    <div class="d-flex justify-content-between align-items-center mt-2 mb-4">
+        <h2 class="fw-bold mb-0"><i class="bi bi-list-ol text-primary me-2"></i>Ergebnisse</h2>
+        <AuthorizeView Roles="Admin,Organizer">
+            <Authorized>
+                <button class="btn btn-primary" @onclick="StartAddResult"><i class="bi bi-plus-lg me-1"></i>Ergebnis hinzufügen</button>
+            </Authorized>
+        </AuthorizeView>
+    </div>
 
-    @if (Standings == null)
+    @if (ErrorMessage != null)
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    @if (Results == null)
     {
         <p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</p>
     }
-    else if (Standings.Count == 0)
+    else if (Results.Count == 0)
     {
-        <p class="text-muted">Noch keine Ergebnisse für dieses Turnier - über "CSV" auf der Turnierliste importieren.</p>
+        <p class="text-muted">Noch keine Ergebnisse für dieses Turnier - über "Import" auf der Turnierliste importieren, oder oben manuell hinzufügen.</p>
     }
     else
     {
-        @foreach (var group in Standings.GroupBy(r => r.AgeGroup ?? (r.TeamName != null ? "Teams" : "Ohne"))
+        @foreach (var group in Results.GroupBy(r => r.AgeGroup ?? (r.TeamName != null ? "Teams" : "Ohne"))
                       .OrderBy(g => g.Key.Length).ThenBy(g => g.Key))
         {
             <div class="card sm-card mb-4">
@@ -28,17 +40,43 @@
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th>Rang</th><th>Name / Team</th><th>Verein</th><th class="text-center">Punkte</th><th class="text-center">Runden</th></tr>
+                            <tr>
+                                <th>Rang</th><th>Name / Team</th><th>Verein</th>
+                                <th class="text-center">Punkte</th>
+                                <AuthorizeView Roles="Admin,Organizer"><Authorized><th></th></Authorized></AuthorizeView>
+                            </tr>
                         </thead>
                         <tbody>
-                            @foreach (var row in group.OrderBy(r => r.Rank))
+                            @foreach (var row in group.OrderBy(r => r.Rank ?? int.MaxValue).ThenByDescending(r => r.Points))
                             {
                                 <tr>
-                                    <td class="fw-bold">@RankBadge(row.Rank)</td>
+                                    <AuthorizeView Roles="Admin,Organizer" Context="editCtx">
+                                        <Authorized>
+                                            <td style="width:90px;">
+                                                <input type="number" class="form-control form-control-sm" value="@row.Rank"
+                                                       @onchange="e => UpdateRankAsync(row, e.Value?.ToString())" />
+                                            </td>
+                                        </Authorized>
+                                        <NotAuthorized>
+                                            <td class="fw-bold">@(row.Rank?.ToString() ?? "-")</td>
+                                        </NotAuthorized>
+                                    </AuthorizeView>
                                     <td class="fw-bold">@row.DisplayName</td>
                                     <td class="text-muted small">@row.ClubName</td>
-                                    <td class="text-center fw-bold sm-points">@row.Points</td>
-                                    <td class="text-center text-muted">@row.TournamentsPlayed</td>
+                                    <AuthorizeView Roles="Admin,Organizer" Context="editCtx2">
+                                        <Authorized>
+                                            <td style="width:110px;" class="text-center">
+                                                <input type="number" step="0.5" class="form-control form-control-sm text-center fw-bold sm-points"
+                                                       value="@row.Points" @onchange="e => UpdatePointsAsync(row, e.Value?.ToString())" />
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteResultAsync(row)"><i class="bi bi-trash"></i></button>
+                                            </td>
+                                        </Authorized>
+                                        <NotAuthorized>
+                                            <td class="text-center fw-bold sm-points">@row.Points</td>
+                                        </NotAuthorized>
+                                    </AuthorizeView>
                                 </tr>
                             }
                         </tbody>
@@ -49,20 +87,123 @@
     }
 </div>
 
+@if (IsAddResultOpen)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.4);" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ergebnis hinzufügen</h5>
+                    <button class="btn-close" @onclick="() => IsAddResultOpen = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2 form-check">
+                        <input type="checkbox" class="form-check-input" id="isTeam" @bind="NewIsTeam" />
+                        <label class="form-check-label" for="isTeam">Team-Ergebnis (statt Einzelspieler)</label>
+                    </div>
+                    @if (NewIsTeam)
+                    {
+                        <div class="mb-2"><label class="form-label">Team-Name</label><input class="form-control" @bind="NewTeamName" /></div>
+                    }
+                    else
+                    {
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label">Vorname</label><input class="form-control" @bind="NewFirstname" /></div>
+                            <div class="col-6"><label class="form-label">Nachname</label><input class="form-control" @bind="NewLastname" /></div>
+                        </div>
+                        <div class="mb-2"><label class="form-label">Verein (optional, neu falls unbekannt)</label><input class="form-control" @bind="NewClubName" /></div>
+                    }
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label">Punkte</label><input type="number" step="0.5" class="form-control" @bind="NewPoints" /></div>
+                        <div class="col-6"><label class="form-label">Rang (optional)</label><input type="number" class="form-control" @bind="NewRank" /></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => IsAddResultOpen = false">Abbrechen</button>
+                    <button class="btn btn-primary" @onclick="SaveNewResultAsync">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public int Id { get; set; }
-    private List<StandingRowDto>? Standings;
+    private List<TournamentResultDto>? Results;
+    private string? ErrorMessage;
 
-    protected override async Task OnInitializedAsync()
+    private bool IsAddResultOpen;
+    private bool NewIsTeam;
+    private string NewFirstname = "";
+    private string NewLastname = "";
+    private string NewClubName = "";
+    private string NewTeamName = "";
+    private double NewPoints;
+    private int? NewRank;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
     {
-        Standings = await TournamentSvc.GetStandingsAsync(Id);
+        try { Results = await TournamentSvc.GetResultsAsync(Id); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
     }
 
-    private MarkupString RankBadge(int rank) => rank switch
+    private async Task UpdatePointsAsync(TournamentResultDto row, string? value)
     {
-        1 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill text-warning ms-1\" title=\"Gold\"></i>"),
-        2 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill text-secondary ms-1\" title=\"Silber\"></i>"),
-        3 => new MarkupString($"{rank}. <i class=\"bi bi-trophy-fill\" style=\"color:#cd7f32;\" title=\"Bronze\"></i>"),
-        _ => new MarkupString($"{rank}."),
-    };
+        if (!double.TryParse(value, out var points)) return;
+        try
+        {
+            await TournamentSvc.UpdateResultAsync(Id, row.Id, points, row.Rank);
+            row.Points = points;
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task UpdateRankAsync(TournamentResultDto row, string? value)
+    {
+        int? rank = int.TryParse(value, out var r) ? r : null;
+        try
+        {
+            await TournamentSvc.UpdateResultAsync(Id, row.Id, row.Points, rank);
+            row.Rank = rank;
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task DeleteResultAsync(TournamentResultDto row)
+    {
+        try
+        {
+            await TournamentSvc.DeleteResultAsync(Id, row.Id);
+            Results?.Remove(row);
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private void StartAddResult()
+    {
+        NewIsTeam = false; NewFirstname = ""; NewLastname = ""; NewClubName = ""; NewTeamName = ""; NewPoints = 0; NewRank = null;
+        IsAddResultOpen = true;
+    }
+
+    private async Task SaveNewResultAsync()
+    {
+        try
+        {
+            var request = new CreateResultRequest
+            {
+                Points = NewPoints,
+                Rank = NewRank,
+                TeamName = NewIsTeam ? NewTeamName : null,
+                Firstname = NewIsTeam ? null : NewFirstname,
+                Lastname = NewIsTeam ? null : NewLastname,
+                ClubName = NewIsTeam ? null : NewClubName,
+            };
+            await TournamentSvc.CreateResultAsync(Id, request);
+            IsAddResultOpen = false;
+            await LoadAsync();
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
 }

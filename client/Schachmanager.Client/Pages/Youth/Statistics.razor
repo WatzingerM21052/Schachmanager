@@ -130,6 +130,8 @@
     private List<string> AvailableSeasons = new();
     private string SelectedSeason = SeasonHelper.CurrentSeason();
 
+    private bool _pendingChartRender;
+
     protected override async Task OnInitializedAsync()
     {
         Members = await YouthSvc.GetMembersAsync();
@@ -141,11 +143,23 @@
             if (!AvailableSeasons.Contains(SeasonHelper.CurrentSeason())) AvailableSeasons.Insert(0, SeasonHelper.CurrentSeason());
             SelectedSeason = AvailableSeasons.FirstOrDefault() ?? SeasonHelper.CurrentSeason();
         }
+
+        // Blazor renders ONCE immediately when OnInitializedAsync first awaits (with
+        // Members still null, showing the spinner) - that render is firstRender=true,
+        // BEFORE the data above has loaded. The <canvas> elements don't exist in the DOM
+        // until the *next* render (once Members is set), so a "firstRender" check here
+        // was always false right when we needed it. Use a pending-flag instead, consumed
+        // in OnAfterRenderAsync regardless of firstRender.
+        _pendingChartRender = true;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && Members != null) await RenderChartsAsync();
+        if (_pendingChartRender)
+        {
+            _pendingChartRender = false;
+            await RenderChartsAsync();
+        }
     }
 
     private IEnumerable<AttendanceDto> FilteredAttendance() =>

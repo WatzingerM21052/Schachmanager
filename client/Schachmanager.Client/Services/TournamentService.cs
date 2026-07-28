@@ -52,4 +52,27 @@ public class TournamentService
         await response.EnsureApiSuccessAsync();
         return (await response.Content.ReadFromJsonAsync<ImportResultDto>(ApiJson.Options))!;
     }
+
+    public async Task<List<TournamentResultDto>> GetResultsAsync(int tournamentId) =>
+        await _http.GetFromJsonAsync<List<TournamentResultDto>>($"api/tournaments/{tournamentId}/results", ApiJson.Options) ?? new();
+
+    public async Task<TournamentResultDto> CreateResultAsync(int tournamentId, CreateResultRequest request)
+    {
+        var response = await _http.PostAsJsonAsync($"api/tournaments/{tournamentId}/results", request, ApiJson.Options);
+        await response.EnsureApiSuccessAsync();
+        return (await response.Content.ReadFromJsonAsync<TournamentResultDto>(ApiJson.Options))!;
+    }
+
+    public async Task<TournamentResultDto> UpdateResultAsync(int tournamentId, int resultId, double points, int? rank)
+    {
+        var response = await _http.PutAsJsonAsync($"api/tournaments/{tournamentId}/results/{resultId}", new UpdateResultRequest { Points = points, Rank = rank }, ApiJson.Options);
+        await response.EnsureApiSuccessAsync();
+        return (await response.Content.ReadFromJsonAsync<TournamentResultDto>(ApiJson.Options))!;
+    }
+
+    public async Task DeleteResultAsync(int tournamentId, int resultId)
+    {
+        var response = await _http.DeleteAsync($"api/tournaments/{tournamentId}/results/{resultId}");
+        await response.EnsureApiSuccessAsync();
+    }
 }

@@ -11,6 +11,7 @@ import * as imports from "./routes/imports";
 import * as standings from "./routes/standings";
 import * as youth from "./routes/youth";
 import * as hallOfFame from "./routes/hallOfFame";
+import * as results from "./routes/results";
 import * as backup from "./routes/backup";
 import * as googleDriveBackup from "./routes/googleDriveBackup";
 
@@ -29,6 +30,7 @@ router.get("/api/players", players.listPlayers);
 router.get("/api/tournaments", tournaments.listTournaments);
 router.get("/api/tournaments/:id", tournaments.getTournament);
 router.get("/api/tournaments/:id/standings", standings.getTournamentStandings);
+router.get("/api/tournaments/:id/results", results.listResults);
 router.get("/api/leaderboard", standings.getLeaderboard);
 router.get("/api/hall-of-fame", hallOfFame.getHallOfFame);
 
@@ -47,6 +49,9 @@ router.post("/api/tournaments", organizer, tournaments.createTournament);
 router.put("/api/tournaments/:id", organizer, tournaments.updateTournament);
 router.delete("/api/tournaments/:id", organizer, tournaments.deleteTournament);
 router.post("/api/tournaments/:id/import", organizer, imports.importCsv);
+router.post("/api/tournaments/:id/results", organizer, results.createResult);
+router.put("/api/tournaments/:id/results/:resultId", organizer, results.updateResult);
+router.delete("/api/tournaments/:id/results/:resultId", organizer, results.deleteResult);
 
 // --- Member+ youth/attendance endpoints (contains member PII, not public) ---
 const member = requireRole("Member");

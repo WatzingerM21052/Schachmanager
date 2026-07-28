@@ -62,4 +62,43 @@ public class ImportResultDto
 {
     public bool Success { get; set; }
     public int RowsImported { get; set; }
+    public int NewPlayers { get; set; }
+    public int NewClubs { get; set; }
+    public int Skipped { get; set; }
+    public List<string> SkippedRows { get; set; } = new();
+}
+
+/// <summary>One raw, individually-editable TournamentResults row - as opposed to
+/// StandingRowDto, which is a computed/ranked/aggregated view.</summary>
+public class TournamentResultDto
+{
+    public int Id { get; set; }
+    public int TournamentId { get; set; }
+    public int? PlayerId { get; set; }
+    public string? TeamName { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public string? ClubName { get; set; }
+    public string? AgeGroup { get; set; }
+    public double Points { get; set; }
+    public int? Rank { get; set; }
+    public int? BoardNo { get; set; }
+    public int? RoundNo { get; set; }
+    public string? ResultCode { get; set; }
+}
+
+public class CreateResultRequest
+{
+    public int? PlayerId { get; set; }
+    public string? Firstname { get; set; }
+    public string? Lastname { get; set; }
+    public string? ClubName { get; set; }
+    public string? TeamName { get; set; }
+    public double Points { get; set; }
+    public int? Rank { get; set; }
+}
+
+public class UpdateResultRequest
+{
+    public double Points { get; set; }
+    public int? Rank { get; set; }
 }

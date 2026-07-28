@@ -145,7 +145,12 @@
             var file = e.File;
             using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
             var result = await TournamentSvc.ImportCsvAsync(t.Id, stream, file.Name);
-            StatusMessage = $"{result.RowsImported} Zeilen aus '{file.Name}' importiert.";
+            var details = new List<string>();
+            if (result.NewPlayers > 0) details.Add($"{result.NewPlayers} neue Spieler");
+            if (result.NewClubs > 0) details.Add($"{result.NewClubs} neue Vereine");
+            if (result.Skipped > 0) details.Add($"{result.Skipped} Zeilen übersprungen (kein Name erkannt)");
+            var suffix = details.Count > 0 ? $" ({string.Join(", ", details)})" : "";
+            StatusMessage = $"{result.RowsImported} Zeilen aus '{file.Name}' importiert{suffix}.";
         }
         catch (ApiException ex) { ErrorMessage = ex.Message; }
     }

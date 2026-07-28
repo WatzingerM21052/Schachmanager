@@ -2,11 +2,12 @@ import type { Env } from "../env";
 import { error, json } from "../http";
 import type { AuthedRequest } from "../auth/middleware";
 import { logAudit } from "../db/audit";
-import type { TournamentRow, ClubRow, PlayerRow } from "../db/types";
+import type { TournamentRow } from "../db/types";
 import { getFormat } from "../formats";
 import type { ParsedResultRow } from "../formats/types";
 import { parseCsvLines } from "../formats/csvUtils";
 import { xlsxToRows } from "../formats/xlsxUtils";
+import { findOrCreateClub, findOrCreatePlayer, splitPersonName } from "../db/playerLookup";
 
 /** .xlsx files are ZIP archives, which always start with the "PK" magic bytes - checking
  * this (rather than trusting only the filename/content-type) means a mislabeled upload
@@ -15,40 +16,13 @@ function looksLikeXlsx(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b;
 }
 
-async function findOrCreateClub(env: Env, name: string | null | undefined): Promise<number | null> {
-  if (!name || !name.trim()) return null;
-  const existing = await env.DB.prepare("SELECT id FROM Clubs WHERE lower(name) = lower(?)").bind(name.trim()).first<ClubRow>();
-  if (existing) return existing.id;
-  const result = await env.DB.prepare("INSERT INTO Clubs (name) VALUES (?)").bind(name.trim()).run();
-  return result.meta.last_row_id;
-}
-
-async function findOrCreatePlayer(
-  env: Env,
-  firstname: string | undefined,
-  lastname: string | undefined,
-  extra?: { elo?: number | null; country?: string | null; clubId?: number | null }
-): Promise<number | null> {
-  if (!lastname) return null;
-  const existing = await env.DB.prepare(
-    "SELECT id FROM Players WHERE lower(firstname) = lower(?) AND lower(lastname) = lower(?)"
-  )
-    .bind(firstname ?? "", lastname)
-    .first<PlayerRow>();
-  if (existing) return existing.id;
-
-  const result = await env.DB.prepare(
-    "INSERT INTO Players (firstname, lastname, elo, country, club_id) VALUES (?, ?, ?, ?, ?)"
-  )
-    .bind(firstname ?? "", lastname, extra?.elo ?? null, extra?.country ?? null, extra?.clubId ?? null)
-    .run();
-  return result.meta.last_row_id;
-}
-
 /**
- * POST /api/tournaments/{id}/import - CSV upload (multipart or raw text body).
+ * POST /api/tournaments/{id}/import - CSV or .xlsx upload (multipart or raw body).
  * Dispatches parsing to the tournament's format module, resolves player/club names to IDs
- * (creating them if new), and inserts/updates TournamentResults rows.
+ * (creating them if new), and inserts/updates TournamentResults rows. Reports back how
+ * many players/clubs were newly created vs matched to existing ones, and which rows (if
+ * any) couldn't be resolved to a name at all, so an organizer can immediately sanity-check
+ * an import instead of only finding out something's off once they look at the standings.
  */
 export async function importCsv(request: AuthedRequest, env: Env): Promise<Response> {
   const tournamentId = Number(request.params?.id);
@@ -77,17 +51,31 @@ export async function importCsv(request: AuthedRequest, env: Env): Promise<Respo
   if (parsedRows.length === 0) return error(env, "No recognizable rows found in the uploaded file (check header names)", 400);
 
   let inserted = 0;
+  let newPlayers = 0;
+  let newClubs = 0;
+  let skipped = 0;
+  const skippedRows: string[] = [];
+
   for (const row of parsedRows) {
     let playerId: number | null = null;
     if (row.lastname) {
-      const clubId = await findOrCreateClub(env, row.clubName);
-      playerId = await findOrCreatePlayer(env, row.firstname, row.lastname, { elo: row.elo, country: row.country, clubId });
+      const club = await findOrCreateClub(env, row.clubName);
+      if (club?.created) newClubs++;
+      const player = await findOrCreatePlayer(env, row.firstname, row.lastname, { elo: row.elo, country: row.country, clubId: club?.id ?? null });
+      if (player?.created) newPlayers++;
+      playerId = player?.id ?? null;
+    } else if (!row.teamName) {
+      // Neither an individual name nor a team name - this row couldn't be resolved at all.
+      skipped++;
+      skippedRows.push(JSON.stringify(row));
+      continue;
     }
 
     let opponentId: number | null = null;
     if (row.opponentName) {
-      const { firstname, lastname } = splitOpponentName(row.opponentName);
-      opponentId = await findOrCreatePlayer(env, firstname, lastname);
+      const { firstname, lastname } = splitPersonName(row.opponentName);
+      const opponent = await findOrCreatePlayer(env, firstname, lastname);
+      opponentId = opponent?.id ?? null;
     }
 
     await env.DB.prepare(
@@ -113,15 +101,6 @@ export async function importCsv(request: AuthedRequest, env: Env): Promise<Respo
     inserted++;
   }
 
-  await logAudit(env, request.user!.sub, "import_csv", "Tournament", tournamentId, { rows: inserted, format: tournament.format });
-  return json(env, { success: true, rowsImported: inserted });
-}
-
-function splitOpponentName(name: string): { firstname: string; lastname: string } {
-  if (name.includes(",")) {
-    const [last, first] = name.split(",");
-    return { lastname: last.trim(), firstname: (first ?? "").trim() };
-  }
-  const parts = name.trim().split(/\s+/);
-  return { lastname: parts[0] ?? "", firstname: parts.slice(1).join(" ") };
+  await logAudit(env, request.user!.sub, "import_csv", "Tournament", tournamentId, { rows: inserted, newPlayers, newClubs, skipped, format: tournament.format });
+  return json(env, { success: true, rowsImported: inserted, newPlayers, newClubs, skipped, skippedRows: skippedRows.slice(0, 10) });
 }
