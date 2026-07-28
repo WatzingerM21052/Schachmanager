@@ -1,34 +1,57 @@
+@implements IDisposable
+
 <div class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
-    <a class="navbar-brand fw-bold" href="">
-        <i class="bi bi-chess-knight me-1"></i> Schachmanager
+    <a class="navbar-brand d-flex align-items-center gap-2" href="">
+        <img src="favicon.svg" alt="Schachmanager" width="36" height="36" class="rounded" />
+        <span class="sm-wordmark">Schachmanager</span>
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
         <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
-            <li class="nav-item"><NavLink class="nav-link" href="" Match="NavLinkMatch.All"><i class="bi bi-house-door me-1"></i>Home</NavLink></li>
-            <li class="nav-item"><NavLink class="nav-link" href="turniere"><i class="bi bi-trophy me-1"></i>Turniere</NavLink></li>
-            <li class="nav-item"><NavLink class="nav-link" href="spieler"><i class="bi bi-people me-1"></i>Spieler</NavLink></li>
-            <li class="nav-item"><NavLink class="nav-link" href="vereine"><i class="bi bi-shield me-1"></i>Vereine</NavLink></li>
-            <li class="nav-item"><NavLink class="nav-link" href="auswertung"><i class="bi bi-graph-up-arrow me-1"></i>Auswertung</NavLink></li>
+            <li class="nav-item"><NavLink class="nav-link" href="" Match="NavLinkMatch.All"><i class="bi bi-house-door me-1"></i>@Culture.T("nav.home")</NavLink></li>
+
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-trophy me-1"></i>@Culture.T("nav.tournamentsGroup")
+                </a>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                    <li><NavLink class="dropdown-item" href="turniere"><i class="bi bi-trophy me-2"></i>@Culture.T("nav.tournaments")</NavLink></li>
+                    <li><NavLink class="dropdown-item" href="spieler"><i class="bi bi-people me-2"></i>@Culture.T("nav.players")</NavLink></li>
+                    <li><NavLink class="dropdown-item" href="vereine"><i class="bi bi-shield me-2"></i>@Culture.T("nav.clubs")</NavLink></li>
+                    <li><NavLink class="dropdown-item" href="auswertung"><i class="bi bi-graph-up-arrow me-2"></i>@Culture.T("nav.standings")</NavLink></li>
+                </ul>
+            </li>
 
             <AuthorizeView Roles="Admin,Organizer">
                 <Authorized>
-                    <li class="nav-item"><NavLink class="nav-link" href="youth"><i class="bi bi-person-badge me-1"></i>Jugend</NavLink></li>
-                    <li class="nav-item"><NavLink class="nav-link" href="attendance"><i class="bi bi-calendar-check me-1"></i>Anwesenheit</NavLink></li>
-                    <li class="nav-item"><NavLink class="nav-link" href="statistics"><i class="bi bi-bar-chart-line me-1"></i>Statistik</NavLink></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-badge me-1"></i>@Culture.T("nav.youthGroup")
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li><NavLink class="dropdown-item" href="youth"><i class="bi bi-person-badge me-2"></i>@Culture.T("nav.youth")</NavLink></li>
+                            <li><NavLink class="dropdown-item" href="attendance"><i class="bi bi-calendar-check me-2"></i>@Culture.T("nav.attendance")</NavLink></li>
+                            <li><NavLink class="dropdown-item" href="statistics"><i class="bi bi-bar-chart-line me-2"></i>@Culture.T("nav.statistics")</NavLink></li>
+                        </ul>
+                    </li>
                 </Authorized>
             </AuthorizeView>
 
             <AuthorizeView Roles="Admin">
                 <Authorized>
-                    <li class="nav-item"><NavLink class="nav-link" href="admin/users"><i class="bi bi-person-gear me-1"></i>Benutzer</NavLink></li>
+                    <li class="nav-item"><NavLink class="nav-link" href="admin/users"><i class="bi bi-person-gear me-1"></i>@Culture.T("nav.users")</NavLink></li>
                 </Authorized>
             </AuthorizeView>
         </ul>
 
-        <ul class="navbar-nav">
+        <ul class="navbar-nav align-items-lg-center gap-2">
+            <li class="nav-item btn-group btn-group-sm" role="group">
+                <button class="btn @(Culture.Language == "de" ? "btn-light" : "btn-outline-light")" @onclick='() => SetLanguageAsync("de")'>DE</button>
+                <button class="btn @(Culture.Language == "en" ? "btn-light" : "btn-outline-light")" @onclick='() => SetLanguageAsync("en")'>EN</button>
+            </li>
+
             <AuthorizeView>
                 <Authorized>
                     <li class="nav-item d-flex flex-wrap align-items-center gap-2 py-1">
@@ -36,11 +59,11 @@
                             <i class="bi bi-person-circle me-1"></i>@context.User.Identity?.Name
                             <span class="badge bg-primary ms-1">@(context.User.FindFirst("role")?.Value)</span>
                         </span>
-                        <button class="btn btn-outline-light btn-sm" @onclick="LogoutAsync"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+                        <button class="btn btn-outline-light btn-sm" @onclick="LogoutAsync"><i class="bi bi-box-arrow-right me-1"></i>@Culture.T("nav.logout")</button>
                     </li>
                 </Authorized>
                 <NotAuthorized>
-                    <li class="nav-item"><NavLink class="nav-link" href="login"><i class="bi bi-box-arrow-in-right me-1"></i>Login</NavLink></li>
+                    <li class="nav-item"><NavLink class="nav-link" href="login"><i class="bi bi-box-arrow-in-right me-1"></i>@Culture.T("nav.login")</NavLink></li>
                 </NotAuthorized>
             </AuthorizeView>
         </ul>
@@ -50,10 +73,21 @@
 @code {
     [Inject] private AuthService AuthSvc { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private CultureService Culture { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Culture.EnsureInitializedAsync();
+        Culture.OnChange += StateHasChanged;
+    }
+
+    private async Task SetLanguageAsync(string lang) => await Culture.SetLanguageAsync(lang);
 
     private async Task LogoutAsync()
     {
         await AuthSvc.LogoutAsync();
         Nav.NavigateTo("", forceLoad: false); // relative to <base href>, NOT "/" which ignores base href entirely
     }
+
+    public void Dispose() => Culture.OnChange -= StateHasChanged;
 }

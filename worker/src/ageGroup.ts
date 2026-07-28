@@ -19,7 +19,7 @@ export function ageGroupForBirthYear(birthYear: number, seasonYear: number = cur
   if (age <= 16) return "U16";
   if (age <= 18) return "U18";
   if (age <= 20) return "U20";
-  return "Ue20";
+  return "Ü20";
 }
 
 export function ageGroupForBirthdate(birthdate: string, seasonYear: number = currentSeasonYear()): string {

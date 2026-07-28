@@ -1,5 +1,6 @@
 @page "/turniere"
 @inject TournamentService TournamentSvc
+@inject CultureService Culture
 
 <PageTitle>Schachmanager - Turniere</PageTitle>
 
@@ -37,7 +38,7 @@
                 {
                     <tr>
                         <td>@t.Name</td>
-                        <td>@t.Date</td>
+                        <td>@Culture.FormatDate(t.Date)</td>
                         <td><span class="badge bg-info text-dark">@t.Format</span></td>
                         <td>@t.Season</td>
                         <td>
@@ -100,7 +101,11 @@
     private bool IsEditorOpen;
     private TournamentDto Editing = new();
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await Culture.EnsureInitializedAsync();
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

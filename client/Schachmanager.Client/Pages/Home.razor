@@ -1,32 +1,94 @@
 @page "/"
+@implements IDisposable
 @inject TournamentService TournamentSvc
+@inject ClubService ClubSvc
+@inject PlayerService PlayerSvc
+@inject CultureService Culture
 
-<PageTitle>Schachmanager - Home</PageTitle>
+<PageTitle>Schachmanager</PageTitle>
 
 <div class="sm-hero text-white p-5 mb-4">
     <div class="container">
-        <h1 class="display-5 fw-bold text-white"><i class="bi bi-chess-knight me-2 sm-accent-text"></i>Schachmanager</h1>
-        <p class="lead opacity-75">Turnierverwaltung und Vereinsportal - alles an einem Ort.</p>
+        <h1 class="display-5 fw-bold text-white"><i class="bi bi-chess-knight me-2 sm-accent-text"></i>@Culture.T("home.title")</h1>
+        <p class="lead opacity-75" style="max-width: 640px;">@Culture.T("home.subtitle")</p>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="turniere" class="btn btn-warning fw-bold text-dark"><i class="bi bi-trophy me-1"></i>Turniere</a>
-            <a href="auswertung" class="btn btn-outline-light"><i class="bi bi-graph-up-arrow me-1"></i>Auswertung</a>
+            <a href="turniere" class="btn btn-warning fw-bold text-dark"><i class="bi bi-trophy me-1"></i>@Culture.T("home.cta.tournaments")</a>
+            <a href="auswertung" class="btn btn-outline-light"><i class="bi bi-graph-up-arrow me-1"></i>@Culture.T("home.cta.standings")</a>
         </div>
     </div>
 </div>
 
 <div class="container pb-5">
+    <h4 class="fw-bold mb-3">@Culture.T("home.section.overview")</h4>
+    <div class="row g-3 mb-5">
+        <div class="col-4">
+            <div class="card sm-card p-3 text-center h-100">
+                <div class="fs-2 fw-bold sm-accent-text">@(ClubCount?.ToString() ?? "-")</div>
+                <div class="text-muted small text-uppercase">@Culture.T("home.stat.clubs")</div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card sm-card p-3 text-center h-100">
+                <div class="fs-2 fw-bold sm-accent-text">@(PlayerCount?.ToString() ?? "-")</div>
+                <div class="text-muted small text-uppercase">@Culture.T("home.stat.players")</div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card sm-card p-3 text-center h-100">
+                <div class="fs-2 fw-bold sm-accent-text">@(TournamentCount?.ToString() ?? "-")</div>
+                <div class="text-muted small text-uppercase">@Culture.T("home.stat.tournaments")</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <a href="turniere" class="sm-link-card">
+                <div class="card sm-card p-4 d-flex flex-row align-items-center gap-3">
+                    <div class="sm-icon-circle"><i class="bi bi-trophy"></i></div>
+                    <div>
+                        <h6 class="fw-bold mb-1">@Culture.T("home.link.tournaments.title")</h6>
+                        <p class="text-muted small mb-0">@Culture.T("home.link.tournaments.desc")</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="youth" class="sm-link-card">
+                <div class="card sm-card p-4 d-flex flex-row align-items-center gap-3">
+                    <div class="sm-icon-circle"><i class="bi bi-person-badge"></i></div>
+                    <div>
+                        <h6 class="fw-bold mb-1">@Culture.T("home.link.youth.title")</h6>
+                        <p class="text-muted small mb-0">@Culture.T("home.link.youth.desc")</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="vereine" class="sm-link-card">
+                <div class="card sm-card p-4 d-flex flex-row align-items-center gap-3">
+                    <div class="sm-icon-circle"><i class="bi bi-shield"></i></div>
+                    <div>
+                        <h6 class="fw-bold mb-1">@Culture.T("home.link.clubs.title")</h6>
+                        <p class="text-muted small mb-0">@Culture.T("home.link.clubs.desc")</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="fw-bold mb-0"><i class="bi bi-star-fill text-warning me-2"></i>Top 5 - Schülerliga Gesamtwertung</h4>
-        <a href="auswertung" class="small">Vollständige Auswertung <i class="bi bi-arrow-right"></i></a>
+        <h4 class="fw-bold mb-0"><i class="bi bi-star-fill text-warning me-2"></i>@Culture.T("home.section.leaderboard")</h4>
+        <a href="auswertung" class="small text-decoration-none">@Culture.T("nav.standings") <i class="bi bi-arrow-right"></i></a>
     </div>
 
     @if (Top == null)
     {
-        <div class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</div>
+        <div class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>...</div>
     }
     else if (Top.Count == 0)
     {
-        <p class="text-muted">Noch keine Ergebnisse vorhanden.</p>
+        <p class="text-muted">-</p>
     }
     else
     {
@@ -56,17 +118,26 @@
 
 @code {
     private List<StandingRowDto>? Top;
+    private int? ClubCount;
+    private int? PlayerCount;
+    private int? TournamentCount;
 
     protected override async Task OnInitializedAsync()
     {
+        await Culture.EnsureInitializedAsync();
+        Culture.OnChange += StateHasChanged;
+
         try
         {
             var standings = await TournamentSvc.GetLeaderboardAsync(TournamentFormats.SchuelerLiga);
             Top = standings.OrderByDescending(r => r.Points).Take(5).ToList();
         }
-        catch
-        {
-            Top = new();
-        }
+        catch { Top = new(); }
+
+        try { ClubCount = (await ClubSvc.GetAllAsync()).Count; } catch { }
+        try { PlayerCount = (await PlayerSvc.GetAllAsync()).Count; } catch { }
+        try { TournamentCount = (await TournamentSvc.GetAllAsync()).Count; } catch { }
     }
+
+    public void Dispose() => Culture.OnChange -= StateHasChanged;
 }

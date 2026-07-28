@@ -14,6 +14,7 @@ public static class AgeGroupBadge
         "U16" => "bg-danger",
         "U18" => "bg-dark",
         "U20" => "bg-secondary",
+        "Ü20" => "bg-secondary",
         _ => "bg-secondary",
     };
 }

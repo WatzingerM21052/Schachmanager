@@ -1,13 +1,14 @@
 @page "/login"
 @inject AuthService AuthSvc
 @inject NavigationManager Nav
+@inject CultureService Culture
 
 <PageTitle>Schachmanager - Login</PageTitle>
 
 <div class="sm-hero d-flex justify-content-center align-items-center px-3" style="min-height: 80vh;">
     <div class="card sm-card w-100" style="max-width: 380px;">
         <div class="card-body p-4">
-            <h4 class="fw-bold text-center mb-3"><i class="bi bi-chess-knight me-2 sm-accent-text"></i>Anmelden</h4>
+            <h4 class="fw-bold text-center mb-3"><i class="bi bi-chess-knight me-2 sm-accent-text"></i>@Culture.T("login.title")</h4>
 
             @if (!string.IsNullOrEmpty(ErrorMessage))
             {
@@ -16,11 +17,11 @@
 
             <EditForm Model="this" OnValidSubmit="SubmitAsync">
                 <div class="mb-3">
-                    <label class="form-label">Benutzername</label>
+                    <label class="form-label">@Culture.T("login.username")</label>
                     <InputText class="form-control" @bind-Value="Username" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Passwort</label>
+                    <label class="form-label">@Culture.T("login.password")</label>
                     <InputText type="password" class="form-control" @bind-Value="Password" />
                 </div>
                 <button class="btn btn-primary w-100" type="submit" disabled="@IsBusy">
@@ -28,7 +29,7 @@
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Anmelden
+                    @Culture.T("login.submit")
                 </button>
             </EditForm>
         </div>
@@ -40,6 +41,8 @@
     private string Password = "";
     private string? ErrorMessage;
     private bool IsBusy;
+
+    protected override async Task OnInitializedAsync() => await Culture.EnsureInitializedAsync();
 
     private async Task SubmitAsync()
     {

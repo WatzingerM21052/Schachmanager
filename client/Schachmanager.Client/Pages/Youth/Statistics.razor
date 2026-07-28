@@ -19,6 +19,7 @@
                 }
             </select>
             <button class="btn btn-outline-success btn-sm" @onclick="ExportCsvAsync"><i class="bi bi-file-earmark-excel me-1"></i>CSV</button>
+            <button class="btn btn-outline-danger btn-sm" @onclick="ExportPdfAsync"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
         </div>
     </div>
 
@@ -235,5 +236,18 @@
             sb.AppendLine($"{s.Rank};{s.Name};{s.AgeGroup};{s.Count};{Math.Round(s.Percentage)}%");
         }
         await JS.InvokeVoidAsync("downloadFile", $"Statistik_{SelectedSeason.Replace("/", "_")}.csv", sb.ToString());
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        var stats = AttendanceLeaderboard();
+        if (stats.Count == 0) return;
+        var rows = stats.Select(s => new object[] { $"{s.Rank}.", s.Name, s.AgeGroup, s.Count, $"{Math.Round(s.Percentage)}%" }).ToArray();
+        var groups = new[] { new { groupName = "Trainingsfleiß", rows } };
+
+        await JS.InvokeVoidAsync("pdfManager.generateGroupedPdf",
+            $"Statistik_{SelectedSeason.Replace("/", "_")}.pdf",
+            $"Trainingsstatistik Saison {SelectedSeason}", $"Stand: {DateTime.Now:d}",
+            new[] { "Rang", "Name", "Klasse", "Trainings", "Quote" }, groups);
     }
 }

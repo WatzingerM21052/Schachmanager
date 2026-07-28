@@ -7,7 +7,10 @@
 <div class="container-fluid px-4 py-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="fw-bold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Auswertung</h2>
-        <button class="btn btn-outline-success" @onclick="ExportCsvAsync"><i class="bi bi-file-earmark-excel me-1"></i>CSV Export</button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-success" @onclick="ExportCsvAsync"><i class="bi bi-file-earmark-excel me-1"></i>CSV</button>
+            <button class="btn btn-outline-danger" @onclick="ExportPdfAsync"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
+        </div>
     </div>
 
     <div class="card sm-card mb-4">
@@ -126,12 +129,29 @@
         await LoadAsync();
     }
 
+    private bool _pendingChartRender;
+
     private async Task LoadAsync()
     {
         Rows = await TournamentSvc.GetLeaderboardAsync(TournamentFormats.SchuelerLiga, SelectedSeason, UseBestOf4, SelectedAge, SelectedClub);
         AvailableAges = Rows.Select(r => r.AgeGroup ?? "Ohne").Distinct().OrderBy(a => a).ToList();
         AvailableClubs = Rows.Select(r => r.ClubName ?? "Vereinslos").Distinct().OrderBy(c => c).ToList();
-        await RenderChartsAsync();
+
+        // On the very first load, the <canvas> elements don't exist in the DOM yet at this
+        // point (they only render once `Rows != null`, which Blazor hasn't painted until
+        // this method returns) - calling chart JS interop here would silently no-op because
+        // getElementById finds nothing. Defer to OnAfterRenderAsync, which runs after Blazor
+        // has actually painted the canvases.
+        _pendingChartRender = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingChartRender)
+        {
+            _pendingChartRender = false;
+            await RenderChartsAsync();
+        }
     }
 
     private async Task RenderChartsAsync()
@@ -166,6 +186,25 @@
             sb.AppendLine();
         }
         await JS.InvokeVoidAsync("downloadFile", $"Auswertung_{SelectedSeason.Replace("/", "_")}.csv", sb.ToString());
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        if (Rows == null || Rows.Count == 0) return;
+        var groups = Rows.GroupBy(r => r.AgeGroup).OrderBy(g => (g.Key ?? "").Length).ThenBy(g => g.Key)
+            .Select(g => new
+            {
+                groupName = $"Klasse {g.Key}",
+                rows = g.OrderBy(r => r.Rank)
+                    .Select(r => new object[] { $"{r.Rank}.", r.DisplayName, r.ClubName ?? "-", r.Points, r.TournamentsPlayed })
+                    .ToArray(),
+            }).ToArray();
+
+        var subtitle = $"Stand: {DateTime.Now:d}" + (UseBestOf4 ? " (Wertung: Beste 4 Runden)" : "");
+        await JS.InvokeVoidAsync("pdfManager.generateGroupedPdf",
+            $"Auswertung_{SelectedSeason.Replace("/", "_")}.pdf",
+            $"Gesamtwertung Saison {SelectedSeason}", subtitle,
+            new[] { "Rang", "Name", "Verein", "Punkte", "Spiele" }, groups);
     }
 
     private MarkupString RankBadge(int rank) => rank switch

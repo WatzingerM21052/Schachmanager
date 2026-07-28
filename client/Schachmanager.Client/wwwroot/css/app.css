@@ -202,3 +202,53 @@ h1, h2, h3, h4, h5, .fw-bold {
     background: linear-gradient(135deg, var(--sm-primary-dark), var(--sm-primary));
     box-shadow: 0 4px 24px rgba(20, 41, 66, 0.25);
 }
+
+/* Navbar brand/logo */
+.sm-wordmark {
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: 0.02em;
+    background: linear-gradient(90deg, #fff, var(--sm-accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.navbar-brand img {
+    box-shadow: 0 0 0 2px rgba(201, 151, 31, 0.4);
+}
+
+/* Home page quick-link cards */
+.sm-link-card {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    height: 100%;
+}
+
+.sm-link-card:hover .card {
+    transform: translateY(-3px);
+}
+
+.sm-link-card .card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sm-icon-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(30, 58, 95, 0.08);
+    color: var(--sm-primary);
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+    .sm-hero {
+        padding: 2.5rem 1rem !important;
+    }
+}
