@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/client/">
+    <Project Path="client/Schachmanager.Client/Schachmanager.Client.csproj" />
+    <Project Path="client/Schachmanager.Shared/Schachmanager.Shared.csproj" />
+  </Folder>
+</Solution>

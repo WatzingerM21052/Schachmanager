@@ -1,0 +1,21 @@
+name = "schachmanager-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Public origin(s) allowed to call this API (CORS). Add your GitHub Pages URL here,
+# e.g. "https://<your-github-username>.github.io"
+[vars]
+ALLOWED_ORIGIN = "http://localhost:5000"
+PBKDF2_ITERATIONS = "210000"
+
+# Create with: wrangler d1 create schachmanager-db
+# Then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "schachmanager-db"
+database_id = "REPLACE_WITH_REAL_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Secrets (NOT set here - set via `wrangler secret put JWT_SECRET`):
+#   JWT_SECRET       - long random string used to sign session JWTs

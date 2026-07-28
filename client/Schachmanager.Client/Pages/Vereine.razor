@@ -1,0 +1,107 @@
+@page "/vereine"
+@inject ClubService ClubSvc
+
+<PageTitle>Schachmanager - Vereine</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold"><i class="bi bi-shield text-primary me-2"></i>Vereine</h2>
+        <AuthorizeView Roles="Admin,Organizer">
+            <Authorized>
+                <button class="btn btn-primary" @onclick="() => StartCreate()"><i class="bi bi-plus-lg me-1"></i>Neuer Verein</button>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+
+    @if (ErrorMessage != null)
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    @if (Clubs == null)
+    {
+        <p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</p>
+    }
+    else
+    {
+        <table class="table table-hover">
+            <thead><tr><th>Name</th><th style="width:160px;"></th></tr></thead>
+            <tbody>
+                @foreach (var club in Clubs)
+                {
+                    <tr>
+                        <td>@club.Name</td>
+                        <td>
+                            <AuthorizeView Roles="Admin,Organizer">
+                                <Authorized>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartEdit(club)"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(club)"><i class="bi bi-trash"></i></button>
+                                </Authorized>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (IsEditorOpen)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.4);" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(EditingId == null ? "Neuer Verein" : "Verein bearbeiten")</h5>
+                    <button class="btn-close" @onclick="CloseEditor"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Name</label>
+                    <input class="form-control" @bind="EditName" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseEditor">Abbrechen</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ClubDto>? Clubs;
+    private string? ErrorMessage;
+    private bool IsEditorOpen;
+    private int? EditingId;
+    private string EditName = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { Clubs = await ClubSvc.GetAllAsync(); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private void StartCreate() { EditingId = null; EditName = ""; IsEditorOpen = true; }
+    private void StartEdit(ClubDto club) { EditingId = club.Id; EditName = club.Name; IsEditorOpen = true; }
+    private void CloseEditor() => IsEditorOpen = false;
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            if (EditingId == null) await ClubSvc.CreateAsync(EditName);
+            else await ClubSvc.UpdateAsync(EditingId.Value, EditName);
+            IsEditorOpen = false;
+            await LoadAsync();
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task DeleteAsync(ClubDto club)
+    {
+        try { await ClubSvc.DeleteAsync(club.Id); await LoadAsync(); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+}

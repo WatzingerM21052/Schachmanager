@@ -1,0 +1,170 @@
+@page "/auswertung"
+@inject TournamentService TournamentSvc
+@inject IJSRuntime JS
+
+<PageTitle>Schachmanager - Auswertung</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Auswertung</h2>
+        <button class="btn btn-outline-success" @onclick="ExportCsvAsync"><i class="bi bi-file-earmark-excel me-1"></i>CSV Export</button>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-3">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-auto text-muted fw-bold text-uppercase small"><i class="bi bi-funnel me-1"></i>Filter:</div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" @bind="SelectedSeason" @bind:after="LoadAsync">
+                        @foreach (var s in AvailableSeasons)
+                        {
+                            <option value="@s">Saison @s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" @bind="SelectedAge" @bind:after="LoadAsync">
+                        <option value="Alle">Alle Klassen</option>
+                        @foreach (var a in AvailableAges)
+                        {
+                            <option value="@a">Klasse @a</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" @bind="SelectedClub" @bind:after="LoadAsync">
+                        <option value="Alle">Alle Vereine</option>
+                        @foreach (var c in AvailableClubs)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex justify-content-end">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="bestof4" @bind="UseBestOf4" @bind:after="LoadAsync">
+                        <label class="form-check-label fw-bold small" for="bestof4"><i class="bi bi-trophy me-1"></i>Nur beste 4 Runden werten</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Rows == null)
+    {
+        <p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</p>
+    }
+    else
+    {
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 pt-3 pb-0"><h6 class="text-muted fw-bold text-uppercase small m-0">Altersklassen-Verteilung</h6></div>
+                    <div class="card-body pt-2" style="height:200px;"><canvas id="ageChart"></canvas></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 pt-3 pb-0"><h6 class="text-muted fw-bold text-uppercase small m-0">Vereins-Verteilung (Top 5)</h6></div>
+                    <div class="card-body pt-2" style="height:200px;"><canvas id="clubChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        @foreach (var group in Rows.GroupBy(r => r.AgeGroup).OrderBy(g => (g.Key ?? "").Length).ThenBy(g => g.Key))
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-diagram-3-fill me-2 text-warning"></i>Klasse @group.Key</h5>
+                    <span class="badge bg-light text-dark">@group.Count() Spieler</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Rang</th><th>Name</th><th>Verein</th><th class="text-center">Pkt.</th><th class="text-center">Spiele</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in group.OrderBy(r => r.Rank))
+                            {
+                                <tr>
+                                    <td class="fw-bold">@row.Rank.</td>
+                                    <td class="fw-bold">@row.DisplayName</td>
+                                    <td class="text-muted small">@row.ClubName</td>
+                                    <td class="text-center fw-bold text-success">@row.Points</td>
+                                    <td class="text-center text-muted">@row.TournamentsPlayed</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<StandingRowDto>? Rows;
+    private List<string> AvailableSeasons = new();
+    private List<string> AvailableAges = new();
+    private List<string> AvailableClubs = new();
+    private string SelectedSeason = SeasonHelper.CurrentSeason();
+    private string SelectedAge = "Alle";
+    private string SelectedClub = "Alle";
+    private bool UseBestOf4;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tournaments = await TournamentSvc.GetAllAsync();
+        AvailableSeasons = tournaments
+            .Where(t => t.Format == TournamentFormats.SchuelerLiga)
+            .Select(t => SeasonHelper.SeasonLabelForDate(t.Date))
+            .Distinct().OrderByDescending(s => s).ToList();
+        if (!AvailableSeasons.Contains(SelectedSeason) && AvailableSeasons.Count > 0)
+        {
+            SelectedSeason = AvailableSeasons[0];
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Rows = await TournamentSvc.GetLeaderboardAsync(TournamentFormats.SchuelerLiga, SelectedSeason, UseBestOf4, SelectedAge, SelectedClub);
+        AvailableAges = Rows.Select(r => r.AgeGroup ?? "Ohne").Distinct().OrderBy(a => a).ToList();
+        AvailableClubs = Rows.Select(r => r.ClubName ?? "Vereinslos").Distinct().OrderBy(c => c).ToList();
+        await RenderChartsAsync();
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        if (Rows == null || Rows.Count == 0) return;
+        var ageStats = Rows.GroupBy(r => r.AgeGroup).OrderBy(g => (g.Key ?? "").Length).ThenBy(g => g.Key)
+            .Select(g => (Label: g.Key ?? "Ohne", Count: g.Count())).ToList();
+        await JS.InvokeVoidAsync("chartManager.renderBarChart", "ageChart", "Altersklassen",
+            ageStats.Select(x => x.Label).ToArray(), ageStats.Select(x => x.Count).ToArray(), "#0d6efd");
+
+        var clubStats = Rows.GroupBy(r => r.ClubName).OrderByDescending(g => g.Count()).Take(5)
+            .Select(g => (Label: g.Key ?? "Vereinslos", Count: g.Count())).ToList();
+        await JS.InvokeVoidAsync("chartManager.renderBarChart", "clubChart", "Vereine",
+            clubStats.Select(x => x.Label).ToArray(), clubStats.Select(x => x.Count).ToArray(), "#198754");
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        if (Rows == null) return;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Gesamtwertung Saison {SelectedSeason}");
+        sb.AppendLine($"Stand: {DateTime.Now:d} {(UseBestOf4 ? "(Wertung: Beste 4 Runden)" : "")}");
+        sb.AppendLine();
+        foreach (var group in Rows.GroupBy(r => r.AgeGroup).OrderBy(g => (g.Key ?? "").Length).ThenBy(g => g.Key))
+        {
+            sb.AppendLine($"ALTERSKLASSE {group.Key}");
+            sb.AppendLine("Rang;Name;Verein;Punkte;Spiele");
+            foreach (var row in group.OrderBy(r => r.Rank))
+            {
+                sb.AppendLine($"{row.Rank};{row.DisplayName};{row.ClubName};{row.Points};{row.TournamentsPlayed}");
+            }
+            sb.AppendLine();
+        }
+        await JS.InvokeVoidAsync("downloadFile", $"Auswertung_{SelectedSeason.Replace("/", "_")}.csv", sb.ToString());
+    }
+}

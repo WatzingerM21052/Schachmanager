@@ -1,0 +1,49 @@
+@page "/turniere/{Id:int}/standings"
+@inject TournamentService TournamentSvc
+
+<PageTitle>Schachmanager - Turniertabelle</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <a href="turniere" class="small"><i class="bi bi-arrow-left me-1"></i>Zurück zu Turniere</a>
+    <h2 class="fw-bold mt-2"><i class="bi bi-list-ol text-primary me-2"></i>Tabelle</h2>
+
+    @if (Standings == null)
+    {
+        <p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</p>
+    }
+    else if (Standings.Count == 0)
+    {
+        <p class="text-muted">Noch keine Ergebnisse für dieses Turnier - über "CSV" auf der Turnierliste importieren.</p>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr><th>Rang</th><th>Name / Team</th><th>Verein</th><th>Klasse</th><th class="text-center">Punkte</th><th class="text-center">Runden</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Standings)
+                {
+                    <tr>
+                        <td class="fw-bold">@row.Rank.</td>
+                        <td>@row.DisplayName</td>
+                        <td class="text-muted small">@row.ClubName</td>
+                        <td>@(row.AgeGroup != null ? (MarkupString)$"<span class='badge bg-secondary'>{row.AgeGroup}</span>" : (MarkupString)"")</td>
+                        <td class="text-center fw-bold text-success">@row.Points</td>
+                        <td class="text-center text-muted">@row.TournamentsPlayed</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private List<StandingRowDto>? Standings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Standings = await TournamentSvc.GetStandingsAsync(Id);
+    }
+}

@@ -1,0 +1,62 @@
+@page "/setup"
+@inject AuthService AuthSvc
+@inject NavigationManager Nav
+
+<PageTitle>Schachmanager - Ersteinrichtung</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-sm" style="width: 400px;">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-1"><i class="bi bi-rocket-takeoff me-2"></i>Ersteinrichtung</h4>
+            <p class="text-muted small">Legt das erste Admin-Konto an. Funktioniert nur einmal, solange noch kein Benutzer existiert.</p>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger py-2">@ErrorMessage</div>
+            }
+
+            <EditForm Model="this" OnValidSubmit="SubmitAsync">
+                <div class="mb-3">
+                    <label class="form-label">Benutzername</label>
+                    <InputText class="form-control" @bind-Value="Username" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">E-Mail (optional)</label>
+                    <InputText class="form-control" @bind-Value="Email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Passwort (mind. 10 Zeichen)</label>
+                    <InputText type="password" class="form-control" @bind-Value="Password" />
+                </div>
+                <button class="btn btn-primary w-100" type="submit" disabled="@IsBusy">Admin-Konto anlegen</button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Username = "";
+    private string Email = "";
+    private string Password = "";
+    private string? ErrorMessage;
+    private bool IsBusy;
+
+    private async Task SubmitAsync()
+    {
+        IsBusy = true;
+        ErrorMessage = null;
+        try
+        {
+            await AuthSvc.BootstrapAdminAsync(Username, Password, string.IsNullOrWhiteSpace(Email) ? null : Email);
+            Nav.NavigateTo("/");
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+}

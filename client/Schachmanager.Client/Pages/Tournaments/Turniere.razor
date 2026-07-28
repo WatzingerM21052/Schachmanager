@@ -1,0 +1,147 @@
+@page "/turniere"
+@inject TournamentService TournamentSvc
+
+<PageTitle>Schachmanager - Turniere</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold"><i class="bi bi-trophy text-primary me-2"></i>Turniere</h2>
+        <AuthorizeView Roles="Admin,Organizer">
+            <Authorized>
+                <button class="btn btn-primary" @onclick="StartCreate"><i class="bi bi-plus-lg me-1"></i>Neues Turnier</button>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+
+    @if (ErrorMessage != null)
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+    @if (StatusMessage != null)
+    {
+        <div class="alert alert-success">@StatusMessage</div>
+    }
+
+    @if (Tournaments == null)
+    {
+        <p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</p>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr><th>Name</th><th>Datum</th><th>Format</th><th>Saison</th><th style="width:280px;"></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Tournaments)
+                {
+                    <tr>
+                        <td>@t.Name</td>
+                        <td>@t.Date</td>
+                        <td><span class="badge bg-info text-dark">@t.Format</span></td>
+                        <td>@t.Season</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary me-1" href="@($"turniere/{t.Id}/standings")"><i class="bi bi-list-ol"></i> Tabelle</a>
+                            <AuthorizeView Roles="Admin,Organizer">
+                                <Authorized>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartEdit(t)"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger me-1" @onclick="() => DeleteAsync(t)"><i class="bi bi-trash"></i></button>
+                                    <label class="btn btn-sm btn-outline-success mb-0">
+                                        <i class="bi bi-upload"></i> CSV
+                                        <InputFile OnChange="e => ImportCsvAsync(t, e)" class="d-none" accept=".csv" />
+                                    </label>
+                                </Authorized>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (IsEditorOpen)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.4);" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(Editing.Id == 0 ? "Neues Turnier" : "Turnier bearbeiten")</h5>
+                    <button class="btn-close" @onclick="CloseEditor"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label">Name</label><input class="form-control" @bind="Editing.Name" /></div>
+                    <div class="mb-2"><label class="form-label">Datum</label><input type="date" class="form-control" value="@Editing.Date" @onchange="e => Editing.Date = e.Value?.ToString() ?? string.Empty" /></div>
+                    <div class="mb-2">
+                        <label class="form-label">Format</label>
+                        <select class="form-select" @bind="Editing.Format">
+                            @foreach (var f in TournamentFormats.All)
+                            {
+                                <option value="@f">@f</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2"><label class="form-label">Saison (optional, z.B. 2026/2027)</label><input class="form-control" @bind="Editing.Season" /></div>
+                    <div class="mb-2"><label class="form-label">Notizen</label><textarea class="form-control" @bind="Editing.Notes"></textarea></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseEditor">Abbrechen</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TournamentDto>? Tournaments;
+    private string? ErrorMessage;
+    private string? StatusMessage;
+    private bool IsEditorOpen;
+    private TournamentDto Editing = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { Tournaments = await TournamentSvc.GetAllAsync(); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private void StartCreate() { Editing = new TournamentDto { Date = DateTime.Today.ToString("yyyy-MM-dd") }; IsEditorOpen = true; }
+    private void StartEdit(TournamentDto t) { Editing = new TournamentDto { Id = t.Id, Name = t.Name, Date = t.Date, Format = t.Format, Season = t.Season, Notes = t.Notes }; IsEditorOpen = true; }
+    private void CloseEditor() => IsEditorOpen = false;
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            if (Editing.Id == 0) await TournamentSvc.CreateAsync(Editing);
+            else await TournamentSvc.UpdateAsync(Editing);
+            IsEditorOpen = false;
+            StatusMessage = null;
+            await LoadAsync();
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task DeleteAsync(TournamentDto t)
+    {
+        try { await TournamentSvc.DeleteAsync(t.Id); await LoadAsync(); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task ImportCsvAsync(TournamentDto t, InputFileChangeEventArgs e)
+    {
+        ErrorMessage = null;
+        StatusMessage = null;
+        try
+        {
+            var file = e.File;
+            using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var result = await TournamentSvc.ImportCsvAsync(t.Id, stream, file.Name);
+            StatusMessage = $"{result.RowsImported} Zeilen aus '{file.Name}' importiert.";
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+}

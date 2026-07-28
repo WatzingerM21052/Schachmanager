@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Node / Worker
+node_modules/
+.wrangler/
+worker/dist/
+
+# Editor
+.vs/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets - never commit
+.env
+.dev.vars

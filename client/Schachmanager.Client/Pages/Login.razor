@@ -1,0 +1,62 @@
+@page "/login"
+@inject AuthService AuthSvc
+@inject NavigationManager Nav
+
+<PageTitle>Schachmanager - Login</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-sm" style="width: 360px;">
+        <div class="card-body p-4">
+            <h4 class="fw-bold text-center mb-3"><i class="bi bi-chess-knight me-2"></i>Anmelden</h4>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger py-2">@ErrorMessage</div>
+            }
+
+            <EditForm Model="this" OnValidSubmit="SubmitAsync">
+                <div class="mb-3">
+                    <label class="form-label">Benutzername</label>
+                    <InputText class="form-control" @bind-Value="Username" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Passwort</label>
+                    <InputText type="password" class="form-control" @bind-Value="Password" />
+                </div>
+                <button class="btn btn-primary w-100" type="submit" disabled="@IsBusy">
+                    @if (IsBusy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Anmelden
+                </button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Username = "";
+    private string Password = "";
+    private string? ErrorMessage;
+    private bool IsBusy;
+
+    private async Task SubmitAsync()
+    {
+        IsBusy = true;
+        ErrorMessage = null;
+        try
+        {
+            await AuthSvc.LoginAsync(Username, Password);
+            Nav.NavigateTo("/");
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+}

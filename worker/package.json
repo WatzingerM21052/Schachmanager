@@ -1,0 +1,25 @@
+{
+  "name": "schachmanager-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker backend for Schachmanager (auth, tournaments, clubs, players, youth/attendance)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrations:apply:local": "wrangler d1 migrations apply schachmanager-db --local",
+    "migrations:apply:remote": "wrangler d1 migrations apply schachmanager-db --remote",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.6.4",
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.7.3",
+    "vitest": "~2.1.9",
+    "wrangler": "^3.99.0"
+  },
+  "dependencies": {
+    "itty-router": "^5.0.24"
+  }
+}

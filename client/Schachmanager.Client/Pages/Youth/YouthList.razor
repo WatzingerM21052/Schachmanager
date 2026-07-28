@@ -1,0 +1,118 @@
+@page "/youth"
+@attribute [Authorize(Roles = "Admin,Organizer,Member")]
+@inject YouthService YouthSvc
+
+<PageTitle>Schachmanager - Jugend</PageTitle>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold"><i class="bi bi-person-badge text-primary me-2"></i>Jugendmitglieder</h2>
+        <AuthorizeView Roles="Admin,Organizer">
+            <Authorized>
+                <button class="btn btn-primary" @onclick="StartCreate"><i class="bi bi-plus-lg me-1"></i>Neues Mitglied</button>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+
+    @if (ErrorMessage != null)
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    @if (Members == null)
+    {
+        <p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Lade...</p>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead><tr><th>Name</th><th>Geburtsdatum</th><th>Klasse</th><th>Status</th><th style="width:160px;"></th></tr></thead>
+            <tbody>
+                @foreach (var m in Members)
+                {
+                    <tr>
+                        <td class="fw-bold">@m.Lastname @m.Firstname</td>
+                        <td>@m.Birthdate</td>
+                        <td><span class="badge bg-secondary">@m.AgeGroup</span></td>
+                        <td>@m.YouthStatus</td>
+                        <td>
+                            <AuthorizeView Roles="Admin,Organizer">
+                                <Authorized>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartEdit(m)"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(m)"><i class="bi bi-trash"></i></button>
+                                </Authorized>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (IsEditorOpen)
+{
+    <div class="modal d-block" style="background: rgba(0,0,0,0.4);" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(Editing.Id == 0 ? "Neues Mitglied" : "Mitglied bearbeiten")</h5>
+                    <button class="btn-close" @onclick="CloseEditor"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label">Vorname</label><input class="form-control" @bind="Editing.Firstname" /></div>
+                    <div class="mb-2"><label class="form-label">Nachname</label><input class="form-control" @bind="Editing.Lastname" /></div>
+                    <div class="mb-2"><label class="form-label">Geburtsdatum</label><input type="date" class="form-control" value="@Editing.Birthdate" @onchange="e => Editing.Birthdate = e.Value?.ToString() ?? string.Empty" /></div>
+                    <div class="mb-2">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" @bind="Editing.YouthStatus">
+                            <option value="active">Aktiv</option>
+                            <option value="inactive">Inaktiv</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseEditor">Abbrechen</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<YouthMemberDto>? Members;
+    private string? ErrorMessage;
+    private bool IsEditorOpen;
+    private YouthMemberDto Editing = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { Members = await YouthSvc.GetMembersAsync(); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private void StartCreate() { Editing = new YouthMemberDto { Birthdate = DateTime.Today.ToString("yyyy-MM-dd"), YouthStatus = "active" }; IsEditorOpen = true; }
+    private void StartEdit(YouthMemberDto m) { Editing = new YouthMemberDto { Id = m.Id, Firstname = m.Firstname, Lastname = m.Lastname, Birthdate = m.Birthdate, YouthStatus = m.YouthStatus }; IsEditorOpen = true; }
+    private void CloseEditor() => IsEditorOpen = false;
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            if (Editing.Id == 0) await YouthSvc.CreateMemberAsync(Editing);
+            else await YouthSvc.UpdateMemberAsync(Editing);
+            IsEditorOpen = false;
+            await LoadAsync();
+        }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+
+    private async Task DeleteAsync(YouthMemberDto m)
+    {
+        try { await YouthSvc.DeleteMemberAsync(m.Id); await LoadAsync(); }
+        catch (ApiException ex) { ErrorMessage = ex.Message; }
+    }
+}
