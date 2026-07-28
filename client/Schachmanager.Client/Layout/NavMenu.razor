@@ -53,6 +53,6 @@
     private async Task LogoutAsync()
     {
         await AuthSvc.LogoutAsync();
-        Nav.NavigateTo("/", forceLoad: false);
+        Nav.NavigateTo("", forceLoad: false); // relative to <base href>, NOT "/" which ignores base href entirely
     }
 }

@@ -48,7 +48,7 @@
         try
         {
             await AuthSvc.BootstrapAdminAsync(Username, Password, string.IsNullOrWhiteSpace(Email) ? null : Email);
-            Nav.NavigateTo("/");
+            Nav.NavigateTo(""); // relative to <base href>, NOT "/" which ignores base href entirely
         }
         catch (ApiException ex)
         {
